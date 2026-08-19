@@ -10,8 +10,9 @@ import {
   ArrowUpRight,
   ArrowDownRight,
   Users,
-  Radio,
-  Gamepad2
+  Gamepad2,
+  Maximize2,
+  Minimize2
 } from 'lucide-react';
 import { CameraMode, FlightTelemetry, FlapStage, LocalPlayerIdentity, RemotePlayer } from '../../types/flight';
 import { ThrottleSlider } from './ThrottleSlider';
@@ -31,6 +32,8 @@ interface HUDProps {
   toggleMute: () => void;
   onReset: () => void;
   onOpenHelp: () => void;
+  isFullscreen?: boolean;
+  onToggleFullscreen?: () => void;
   multiplayer?: {
     isConnected: boolean;
     onlineCount: number;
@@ -52,136 +55,137 @@ export const HUD: React.FC<HUDProps> = ({
   toggleMute,
   onReset,
   onOpenHelp,
+  isFullscreen = false,
+  onToggleFullscreen,
   multiplayer
 }) => {
   const [showJoystick, setShowJoystick] = useState<boolean>(true);
 
   // Horizon Pitch & Roll transforms
-  const pitchOffsetPx = (telemetry.pitchDeg || 0) * 3.5;
+  const pitchOffsetPx = (telemetry.pitchDeg || 0) * 3.0;
   const rollAngleDeg = -(telemetry.rollDeg || 0);
 
   // Compass Heading formatted
   const headingFormatted = String(Math.round(telemetry.yawDeg)).padStart(3, '0');
 
+  // Determine Cardinal direction
+  const yaw = telemetry.yawDeg || 0;
+  let cardinal = 'N';
+  if (yaw >= 22.5 && yaw < 67.5) cardinal = 'NE';
+  else if (yaw >= 67.5 && yaw < 112.5) cardinal = 'E';
+  else if (yaw >= 112.5 && yaw < 157.5) cardinal = 'SE';
+  else if (yaw >= 157.5 && yaw < 202.5) cardinal = 'S';
+  else if (yaw >= 202.5 && yaw < 247.5) cardinal = 'SW';
+  else if (yaw >= 247.5 && yaw < 292.5) cardinal = 'W';
+  else if (yaw >= 292.5 && yaw < 337.5) cardinal = 'NW';
+
   const pilotsCount = multiplayer ? multiplayer.onlineCount : 1;
 
   return (
-    <div className="absolute inset-0 pointer-events-none select-none flex flex-col justify-between p-3 sm:p-4 z-20 overflow-hidden font-mono">
+    <div className="absolute inset-0 pointer-events-none select-none flex flex-col justify-between p-2.5 sm:p-4 z-20 overflow-hidden font-mono">
       {/* ========================================================================= */}
-      {/* TOP BAR: COMPASS HEADING & UTILITY ACTIONS                                */}
+      {/* TOP BAR: COMPACT STATUS, HEADING & TOOLBAR                                */}
       {/* ========================================================================= */}
-      <div className="flex items-start justify-between w-full">
-        {/* Left Status: Flight Status / Gear & Multiplayer */}
-        <div className="flex flex-col gap-1 bg-slate-900/80 backdrop-blur-md px-3 py-2 rounded-xl border border-sky-500/30 text-xs shadow-xl">
-          <div className="flex items-center gap-2">
-            <span className="text-slate-400">STATE:</span>
-            <span className={`font-bold ${telemetry.isGrounded ? 'text-amber-400' : 'text-emerald-400'}`}>
-              {telemetry.isGrounded ? 'ON GROUND' : 'AIRBORNE'}
-            </span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-slate-400">CAMERA:</span>
-            <span className="text-sky-300 font-semibold uppercase">{cameraMode}</span>
-          </div>
+      <div className="flex items-center justify-between w-full pointer-events-none gap-2">
+        {/* Left Status: Compact Glass Flight Pill */}
+        <div className="flex items-center gap-1.5 sm:gap-2.5 bg-slate-950/60 backdrop-blur-md px-2.5 py-1.5 rounded-xl border border-sky-500/30 text-[11px] shadow-lg pointer-events-auto">
+          <span className={`font-bold ${telemetry.isGrounded ? 'text-amber-400' : 'text-emerald-400'}`}>
+            {telemetry.isGrounded ? 'GROUND' : 'AIR'}
+          </span>
+          <span className="text-slate-600">|</span>
+          <span className="text-sky-300 uppercase">{cameraMode}</span>
 
-          {/* Multiplayer LAN / Room Indicator */}
-          {multiplayer && (
-            <div className="pt-1 border-t border-slate-700/60 flex flex-col gap-1">
-              <div className="flex items-center gap-1.5">
-                <Radio className={`w-3.5 h-3.5 ${multiplayer.isConnected ? 'text-emerald-400 animate-pulse' : 'text-amber-400'}`} />
-                <span className="text-slate-400">LAN:</span>
-                <span className={`font-bold flex items-center gap-1 ${multiplayer.isConnected ? 'text-emerald-400' : 'text-amber-400'}`}>
-                  <Users className="w-3 h-3 inline" />
-                  {multiplayer.isConnected ? `${pilotsCount} PILOT${pilotsCount > 1 ? 'S' : ''}` : 'CONNECTING...'}
-                </span>
+          {/* Multiplayer pill */}
+          {multiplayer && multiplayer.isConnected && (
+            <>
+              <span className="text-slate-600">|</span>
+              <div className="flex items-center gap-1 text-emerald-400 font-bold">
+                <Users className="w-3 h-3 inline" />
+                <span>{pilotsCount}</span>
               </div>
-              {multiplayer.identity && (
-                <div className="flex items-center gap-1.5 text-[11px]">
-                  <span
-                    className="w-2.5 h-2.5 rounded-full border border-white/40"
-                    style={{ backgroundColor: multiplayer.identity.accentColor }}
-                  />
-                  <span className="text-white font-bold">{multiplayer.identity.callsign}</span>
-                </div>
-              )}
-            </div>
+            </>
           )}
         </div>
 
-        {/* Center: Compass Heading Ribbon */}
-        <div className="flex flex-col items-center bg-slate-900/80 backdrop-blur-md px-4 sm:px-5 py-1.5 sm:py-2 rounded-xl border border-sky-500/30 shadow-xl">
-          <div className="text-[10px] text-slate-400 tracking-widest font-semibold">HEADING</div>
-          <div className="text-base sm:text-lg font-bold text-sky-400 tracking-wider">
+        {/* Center: Minimalist Compass Heading Pip */}
+        <div className="flex items-center gap-1.5 bg-slate-950/60 backdrop-blur-md px-3 py-1.5 rounded-xl border border-sky-500/30 shadow-lg pointer-events-auto">
+          <span className="text-[10px] text-slate-400 font-bold tracking-wider">HDG</span>
+          <span className="text-sm font-bold text-sky-400 tracking-wider">
             {headingFormatted}°
-          </div>
-          {/* Compass visual ticks */}
-          <div className="flex items-center gap-3 text-[10px] text-slate-400 mt-0.5">
-            <span className={telemetry.yawDeg >= 350 || telemetry.yawDeg <= 10 ? 'text-cyan-300 font-bold' : ''}>N</span>
-            <span className={telemetry.yawDeg >= 80 && telemetry.yawDeg <= 100 ? 'text-cyan-300 font-bold' : ''}>E</span>
-            <span className={telemetry.yawDeg >= 170 && telemetry.yawDeg <= 190 ? 'text-cyan-300 font-bold' : ''}>S</span>
-            <span className={telemetry.yawDeg >= 260 && telemetry.yawDeg <= 280 ? 'text-cyan-300 font-bold' : ''}>W</span>
-          </div>
+          </span>
+          <span className="text-[11px] font-bold text-cyan-300">
+            {cardinal}
+          </span>
         </div>
 
         {/* Right: Quick Action Controls Toolbar */}
-        <div className="flex items-center gap-1.5 sm:gap-2 pointer-events-auto">
+        <div className="flex items-center gap-1 sm:gap-1.5 pointer-events-auto">
+          {onToggleFullscreen && (
+            <button
+              onClick={onToggleFullscreen}
+              className="p-2 bg-slate-950/60 hover:bg-slate-800 backdrop-blur-md text-sky-400 hover:text-white rounded-xl border border-sky-500/30 transition-colors shadow-lg"
+              title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}
+            >
+              {isFullscreen ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
+            </button>
+          )}
           <button
             onClick={() => setShowJoystick((prev) => !prev)}
-            className={`p-2.5 rounded-xl border backdrop-blur-md transition-colors shadow-lg ${
+            className={`p-2 rounded-xl border backdrop-blur-md transition-colors shadow-lg ${
               showJoystick
-                ? 'bg-sky-600/30 border-sky-400 text-sky-300'
-                : 'bg-slate-900/80 hover:bg-slate-800 border-sky-500/30 text-slate-400'
+                ? 'bg-sky-600/40 border-sky-400 text-sky-300'
+                : 'bg-slate-950/60 hover:bg-slate-800 border-sky-500/30 text-slate-400'
             }`}
             title="Toggle Virtual Joystick"
           >
-            <Gamepad2 className="w-4 h-4" />
+            <Gamepad2 className="w-3.5 h-3.5" />
           </button>
           <button
             onClick={cycleCamera}
-            className="p-2.5 bg-slate-900/80 hover:bg-slate-800 backdrop-blur-md text-sky-400 hover:text-white rounded-xl border border-sky-500/30 transition-colors shadow-lg"
+            className="p-2 bg-slate-950/60 hover:bg-slate-800 backdrop-blur-md text-sky-400 hover:text-white rounded-xl border border-sky-500/30 transition-colors shadow-lg"
             title="Switch Camera (C)"
           >
-            <Camera className="w-4 h-4" />
+            <Camera className="w-3.5 h-3.5" />
           </button>
           <button
             onClick={toggleMute}
-            className="p-2.5 bg-slate-900/80 hover:bg-slate-800 backdrop-blur-md text-sky-400 hover:text-white rounded-xl border border-sky-500/30 transition-colors shadow-lg"
+            className="p-2 bg-slate-950/60 hover:bg-slate-800 backdrop-blur-md text-sky-400 hover:text-white rounded-xl border border-sky-500/30 transition-colors shadow-lg"
             title="Mute / Unmute Audio (M)"
           >
-            {isMuted ? <VolumeX className="w-4 h-4 text-red-400" /> : <Volume2 className="w-4 h-4" />}
+            {isMuted ? <VolumeX className="w-3.5 h-3.5 text-red-400" /> : <Volume2 className="w-3.5 h-3.5" />}
           </button>
           <button
             onClick={onReset}
-            className="p-2.5 bg-slate-900/80 hover:bg-slate-800 backdrop-blur-md text-sky-400 hover:text-white rounded-xl border border-sky-500/30 transition-colors shadow-lg"
+            className="p-2 bg-slate-950/60 hover:bg-slate-800 backdrop-blur-md text-sky-400 hover:text-white rounded-xl border border-sky-500/30 transition-colors shadow-lg"
             title="Reset Flight (R)"
           >
-            <RotateCcw className="w-4 h-4" />
+            <RotateCcw className="w-3.5 h-3.5" />
           </button>
           <button
             onClick={onOpenHelp}
-            className="p-2.5 bg-sky-600/90 hover:bg-sky-500 text-white rounded-xl border border-sky-400 shadow-lg shadow-sky-500/20 transition-colors"
+            className="p-2 bg-sky-600/90 hover:bg-sky-500 text-white rounded-xl border border-sky-400 shadow-lg shadow-sky-500/20 transition-colors"
             title="Flight Controls Guide (H)"
           >
-            <HelpCircle className="w-4 h-4" />
+            <HelpCircle className="w-3.5 h-3.5" />
           </button>
         </div>
       </div>
 
       {/* ========================================================================= */}
-      {/* CENTER: ARTIFICIAL HORIZON & STALL WARNING                                */}
+      {/* CENTER: TRANSPARENT GLASS RETICLE & MARGIN TAPES                          */}
       {/* ========================================================================= */}
       <div className="relative flex-1 flex items-center justify-center pointer-events-none">
         {/* Stall Warning Flashing Banner */}
         {telemetry.isStalling && !telemetry.isGrounded && (
-          <div className="absolute top-8 sm:top-12 bg-red-600/90 border-2 border-white px-4 sm:px-6 py-2 rounded-xl text-white font-bold text-xs sm:text-base tracking-widest flex items-center gap-2 shadow-[0_0_25px_rgba(239,68,68,0.9)] animate-bounce">
-            <AlertTriangle className="w-5 h-5 animate-pulse" />
-            <span>STALL WARNING! NOSE DOWN / POWER UP</span>
+          <div className="absolute top-2 bg-red-600/90 border border-white px-4 py-1.5 rounded-xl text-white font-bold text-xs sm:text-sm tracking-widest flex items-center gap-2 shadow-[0_0_20px_rgba(239,68,68,0.9)] animate-bounce z-30">
+            <AlertTriangle className="w-4 h-4 animate-pulse" />
+            <span>STALL WARNING! PUSH NOSE DOWN / POWER UP</span>
           </div>
         )}
 
-        {/* Pitch / Roll Horizon Box */}
-        <div className="relative w-44 h-44 sm:w-56 sm:h-56 rounded-full border border-sky-500/20 flex items-center justify-center overflow-hidden">
-          {/* Rotating Horizon Ladder Container */}
+        {/* Minimalist Transparent Horizon Pitch Lines (0% solid background!) */}
+        <div className="relative w-48 h-48 flex items-center justify-center overflow-hidden pointer-events-none">
+          {/* Rotating Pitch Ladder */}
           <div
             className="absolute w-full h-full flex items-center justify-center transition-transform duration-75"
             style={{
@@ -189,114 +193,100 @@ export const HUD: React.FC<HUDProps> = ({
             }}
           >
             {/* Horizon Center Line */}
-            <div className="w-36 sm:w-44 h-[2px] bg-sky-400 shadow-[0_0_8px_rgba(56,189,248,0.8)]" />
+            <div className="w-32 h-[1.5px] bg-sky-400/80 shadow-[0_0_8px_rgba(56,189,248,0.8)]" />
 
-            {/* Pitch Ladders (+10°, +20°, -10°, -20°) */}
-            <div className="absolute top-[calc(50%-35px)] w-20 h-[1.5px] bg-sky-400/70 flex justify-between text-[9px] text-sky-300">
+            {/* Pitch Ladders (+10°, -10°) */}
+            <div className="absolute top-[calc(50%-28px)] w-16 h-[1px] bg-sky-400/60 flex justify-between text-[8px] text-sky-300">
               <span>+10</span>
               <span>+10</span>
             </div>
-            <div className="absolute top-[calc(50%-70px)] w-14 h-[1.5px] bg-sky-400/70 flex justify-between text-[9px] text-sky-300">
-              <span>+20</span>
-              <span>+20</span>
-            </div>
-            <div className="absolute top-[calc(50%+35px)] w-20 h-[1.5px] border-b border-dashed border-sky-400/70 flex justify-between text-[9px] text-sky-300">
+            <div className="absolute top-[calc(50%+28px)] w-16 h-[1px] border-b border-dashed border-sky-400/60 flex justify-between text-[8px] text-sky-300">
               <span>-10</span>
               <span>-10</span>
-            </div>
-            <div className="absolute top-[calc(50%+70px)] w-14 h-[1.5px] border-b border-dashed border-sky-400/70 flex justify-between text-[9px] text-sky-300">
-              <span>-20</span>
-              <span>-20</span>
             </div>
           </div>
 
-          {/* Fixed Aircraft Boresight Crosshair (Center) */}
+          {/* Fixed Boresight Crosshair */}
           <div className="relative z-10 flex items-center justify-center">
-            {/* Center dot */}
-            <div className="w-2.5 h-2.5 rounded-full border-2 border-yellow-400 bg-yellow-400/30" />
-            {/* Left & Right reticle wings */}
-            <div className="absolute -left-7 w-6 h-[2px] bg-yellow-400" />
-            <div className="absolute -right-7 w-6 h-[2px] bg-yellow-400" />
+            <div className="w-2 h-2 rounded-full border border-yellow-400 bg-yellow-400/40" />
+            <div className="absolute -left-5 w-4 h-[1.5px] bg-yellow-400" />
+            <div className="absolute -right-5 w-4 h-[1.5px] bg-yellow-400" />
           </div>
         </div>
 
-        {/* Left Side: Airspeed Indicator Tape */}
-        <div className="absolute left-2 sm:left-4 flex flex-col items-end bg-slate-900/80 backdrop-blur-md px-3 py-2 sm:px-3.5 sm:py-3 rounded-xl border border-sky-500/30 shadow-xl">
-          <span className="text-[9px] sm:text-[10px] text-slate-400 font-semibold tracking-wider">AIRSPEED</span>
-          <div className="flex items-baseline gap-1">
-            <span className="text-xl sm:text-2xl font-bold text-sky-400">{telemetry.airspeedKnots}</span>
-            <span className="text-[10px] sm:text-xs text-sky-400">KTS</span>
+        {/* Left Margin: Slim Airspeed Tape */}
+        <div className="absolute left-1 sm:left-2 flex flex-col items-end bg-slate-950/60 backdrop-blur-md px-2.5 py-1.5 rounded-xl border border-sky-500/25 shadow-lg">
+          <span className="text-[8px] text-slate-400 font-semibold tracking-wider">SPEED</span>
+          <div className="flex items-baseline gap-0.5">
+            <span className="text-base sm:text-lg font-bold text-sky-400">{telemetry.airspeedKnots}</span>
+            <span className="text-[9px] text-sky-400">KT</span>
           </div>
-          <span className="text-[9px] sm:text-[10px] text-slate-400 mt-0.5">
+          <span className="text-[8px] text-slate-400">
             {Math.round(telemetry.airspeedMs * 3.6)} km/h
           </span>
         </div>
 
-        {/* Right Side: Altitude Indicator Tape + Vertical Speed */}
-        <div className="absolute right-2 sm:right-4 flex flex-col items-start bg-slate-900/80 backdrop-blur-md px-3 py-2 sm:px-3.5 sm:py-3 rounded-xl border border-sky-500/30 shadow-xl">
-          <span className="text-[9px] sm:text-[10px] text-slate-400 font-semibold tracking-wider">ALTITUDE</span>
-          <div className="flex items-baseline gap-1">
-            <span className="text-xl sm:text-2xl font-bold text-sky-400">{telemetry.altitudeFeet}</span>
-            <span className="text-[10px] sm:text-xs text-sky-400">FT</span>
+        {/* Right Margin: Slim Altitude Tape + Vertical Speed */}
+        <div className="absolute right-1 sm:right-2 flex flex-col items-start bg-slate-950/60 backdrop-blur-md px-2.5 py-1.5 rounded-xl border border-sky-500/25 shadow-lg">
+          <span className="text-[8px] text-slate-400 font-semibold tracking-wider">ALT</span>
+          <div className="flex items-baseline gap-0.5">
+            <span className="text-base sm:text-lg font-bold text-sky-400">{telemetry.altitudeFeet}</span>
+            <span className="text-[9px] text-sky-400">FT</span>
           </div>
-          <div className="flex items-center gap-1 text-[9px] sm:text-[10px] text-slate-400 mt-0.5">
-            <span>{telemetry.altitudeMeters} m</span>
-            <span className="text-slate-600">|</span>
+          <div className="flex items-center gap-1 text-[8px] text-slate-400">
+            <span>{telemetry.altitudeMeters}m</span>
             {telemetry.verticalSpeedMs >= 0.5 ? (
               <span className="flex items-center text-emerald-400 font-semibold">
-                <ArrowUpRight className="w-3 h-3" />
-                +{Math.round(telemetry.verticalSpeedMs * 196.85)} fpm
+                <ArrowUpRight className="w-2.5 h-2.5" />
+                +{Math.round(telemetry.verticalSpeedMs * 196.85)}
               </span>
             ) : telemetry.verticalSpeedMs <= -0.5 ? (
               <span className="flex items-center text-red-400 font-semibold">
-                <ArrowDownRight className="w-3 h-3" />
-                {Math.round(telemetry.verticalSpeedMs * 196.85)} fpm
+                <ArrowDownRight className="w-2.5 h-2.5" />
+                {Math.round(telemetry.verticalSpeedMs * 196.85)}
               </span>
             ) : (
-              <span className="text-slate-400">0 fpm</span>
+              <span>0 fpm</span>
             )}
           </div>
         </div>
       </div>
 
       {/* ========================================================================= */}
-      {/* BOTTOM BAR: THROTTLE, FLAPS, VIRTUAL JOYSTICK & BRAKES                    */}
+      {/* BOTTOM BAR: LEFT THUMB (THROTTLE/FLAPS) & RIGHT THUMB (JOYSTICK/BRAKES)    */}
       {/* ========================================================================= */}
       <div className="flex items-end justify-between w-full pointer-events-none gap-2">
-        {/* Bottom Left: Throttle Slider + Flap Selector (Left Thumb Zone) */}
-        <div className="flex items-end gap-2 sm:gap-3 pointer-events-auto">
-          <ThrottleSlider throttle={telemetry.throttle} setThrottle={setThrottle} />
-          <FlapSelector flapStage={telemetry.flapStage} setFlapStage={setFlapStage} />
+        {/* Bottom Left Cluster: Slim Throttle + Horizontal Flap Pill */}
+        <div className="flex items-end gap-1.5 pointer-events-auto">
+          <ThrottleSlider throttle={telemetry.throttle} setThrottle={setThrottle} compact={true} />
+          <FlapSelector flapStage={telemetry.flapStage} setFlapStage={setFlapStage} compact={true} />
         </div>
 
-        {/* Bottom Right: Virtual Flight Joystick & Wheel Brakes (Right Thumb Zone) */}
-        <div className="flex items-end gap-2 sm:gap-3 pointer-events-auto">
-          {/* Wheel Brakes Button */}
+        {/* Bottom Right Cluster: Wheel Brakes & Translucent Virtual Joystick */}
+        <div className="flex items-end gap-1.5 pointer-events-auto">
+          {/* Wheel Brakes Trigger Button */}
           <div className="flex flex-col items-end mb-1">
             <button
               onMouseDown={() => setIsBraking(true)}
               onMouseUp={() => setIsBraking(false)}
               onTouchStart={() => setIsBraking(true)}
               onTouchEnd={() => setIsBraking(false)}
-              className={`px-3.5 sm:px-4 py-2.5 sm:py-3 rounded-xl border font-mono text-xs font-bold transition-all shadow-xl flex items-center gap-2 select-none touch-none ${
+              className={`px-2.5 py-2 rounded-xl border font-mono text-[10px] font-bold transition-all shadow-lg flex items-center gap-1 select-none touch-none ${
                 isBraking
-                  ? 'bg-red-600/50 border-red-400 text-red-200 shadow-[0_0_20px_rgba(239,68,68,0.6)] scale-95'
-                  : 'bg-slate-900/80 hover:bg-slate-800 border-sky-500/30 text-slate-200'
+                  ? 'bg-red-600/60 border-red-400 text-white shadow-[0_0_16px_rgba(239,68,68,0.7)] scale-95'
+                  : 'bg-slate-950/60 hover:bg-slate-800 border-sky-500/30 text-slate-300'
               }`}
               style={{ touchAction: 'none' }}
               title="Ground Wheel Brakes (Hold Space / Tap)"
             >
-              <Disc className={`w-4 h-4 ${isBraking ? 'text-red-400 animate-spin' : 'text-slate-400'}`} />
-              <div className="flex flex-col items-start text-left">
-                <span>{isBraking ? 'BRAKING' : 'BRAKES'}</span>
-                <span className="text-[8px] sm:text-[9px] text-slate-400 font-normal">Hold</span>
-              </div>
+              <Disc className={`w-3.5 h-3.5 ${isBraking ? 'text-red-300 animate-spin' : 'text-slate-400'}`} />
+              <span>{isBraking ? 'BRAKING' : 'BRAKE'}</span>
             </button>
           </div>
 
           {/* Virtual Flight Joystick */}
           {showJoystick && (
-            <VirtualJoystick onAxesChange={setVirtualAxes} />
+            <VirtualJoystick onAxesChange={setVirtualAxes} compact={true} />
           )}
         </div>
       </div>

@@ -4,9 +4,10 @@ import { Gauge } from 'lucide-react';
 interface ThrottleSliderProps {
   throttle: number; // 0 - 100
   setThrottle: (val: number | ((prev: number) => number)) => void;
+  compact?: boolean;
 }
 
-export const ThrottleSlider: React.FC<ThrottleSliderProps> = ({ throttle, setThrottle }) => {
+export const ThrottleSlider: React.FC<ThrottleSliderProps> = ({ throttle, setThrottle, compact = false }) => {
   const trackRef = useRef<HTMLDivElement>(null);
   const isDraggingRef = useRef<boolean>(false);
 
@@ -38,6 +39,69 @@ export const ThrottleSlider: React.FC<ThrottleSliderProps> = ({ throttle, setThr
       } catch {}
     }
   };
+
+  if (compact) {
+    return (
+      <div className="flex flex-col items-center bg-slate-950/60 backdrop-blur-md p-1.5 rounded-xl border border-sky-500/30 shadow-2xl pointer-events-auto select-none min-w-[58px]">
+        {/* Compact Percentage */}
+        <div className="text-xs font-bold font-mono text-white mb-0.5 tracking-tight flex items-center gap-0.5">
+          <span>{Math.round(throttle)}</span>
+          <span className="text-[9px] text-sky-400 font-normal">%</span>
+        </div>
+
+        {/* Compact Interactive Vertical Slider Track */}
+        <div
+          ref={trackRef}
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerUp}
+          onPointerCancel={handlePointerUp}
+          className="relative h-28 w-10 flex items-center justify-center my-0.5 cursor-ns-resize touch-none"
+          style={{ touchAction: 'none' }}
+        >
+          {/* Visual Background Track */}
+          <div className="absolute w-3 bg-slate-900/80 rounded-full h-full border border-slate-700/80 overflow-hidden pointer-events-none">
+            <div
+              className="w-full bg-gradient-to-t from-sky-600 via-sky-400 to-cyan-300 rounded-full transition-all duration-75"
+              style={{
+                height: `${throttle}%`,
+                position: 'absolute',
+                bottom: 0
+              }}
+            />
+          </div>
+
+          {/* Custom Visual Thumb Indicator */}
+          <div
+            className="absolute w-8 h-4 rounded-md bg-sky-400 border border-white shadow-[0_0_10px_rgba(56,189,248,0.8)] pointer-events-none transition-all duration-75 z-10 flex items-center justify-center"
+            style={{
+              bottom: `calc(${throttle}% - 8px)`
+            }}
+          >
+            <div className="w-3.5 h-[1.5px] bg-slate-950/70 rounded-full" />
+          </div>
+        </div>
+
+        {/* Compact IDLE / MAX buttons */}
+        <div className="flex gap-1 mt-1 w-full">
+          <button
+            onClick={() => setThrottle(0)}
+            className="flex-1 py-0.5 text-[8px] font-mono font-bold rounded bg-slate-800/80 hover:bg-slate-700 text-slate-300 transition-colors"
+            title="Idle Throttle"
+          >
+            0%
+          </button>
+          <button
+            onClick={() => setThrottle(100)}
+            className="flex-1 py-0.5 text-[8px] font-mono font-bold rounded bg-sky-950/90 hover:bg-sky-900 text-sky-300 border border-sky-600/40 transition-colors"
+            title="Max Throttle"
+          >
+            MAX
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col items-center bg-slate-900/85 backdrop-blur-md p-3 rounded-xl border border-sky-500/30 shadow-2xl pointer-events-auto select-none min-w-[120px]">
