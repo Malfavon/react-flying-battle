@@ -257,14 +257,21 @@ export function useFlightPhysics() {
     if (isGrounded) {
       const horizontalSpeed = Math.max(0, vel.dot(groundForward));
       vel.copy(groundForward.clone().multiplyScalar(horizontalSpeed));
-      vel.multiplyScalar(Math.max(0, 1 - 0.01 * dt * 60));
 
-      // Wheel Brakes
+      // Realistic rolling friction on runway (tarmac rolling resistance)
+      const rollingResistance = 0.03 * Math.max(0, weight - liftForce.y);
+      const rollingDecel = (rollingResistance / mass) * dt;
+      const curSpeed = vel.length();
+      if (curSpeed > 0.01) {
+        vel.setLength(Math.max(0, curSpeed - rollingDecel));
+      }
+
+      // Wheel Brakes (Active when holding Space or tapping Brake button)
       if (inputs.brakes) {
-        const brakeDecel = 14.0 * dt;
-        const curSpeed = vel.length();
-        if (curSpeed > 0.01) {
-          vel.setLength(Math.max(0, curSpeed - brakeDecel));
+        const brakeDecel = 18.0 * dt;
+        const curSpd = vel.length();
+        if (curSpd > 0.01) {
+          vel.setLength(Math.max(0, curSpd - brakeDecel));
         }
       }
 
