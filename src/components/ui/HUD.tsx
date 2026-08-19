@@ -8,9 +8,11 @@ import {
   AlertTriangle,
   Disc,
   ArrowUpRight,
-  ArrowDownRight
+  ArrowDownRight,
+  Users,
+  Radio
 } from 'lucide-react';
-import { CameraMode, FlightTelemetry, FlapStage } from '../../types/flight';
+import { CameraMode, FlightTelemetry, FlapStage, LocalPlayerIdentity, RemotePlayer } from '../../types/flight';
 import { ThrottleSlider } from './ThrottleSlider';
 import { FlapSelector } from './FlapSelector';
 
@@ -26,6 +28,12 @@ interface HUDProps {
   toggleMute: () => void;
   onReset: () => void;
   onOpenHelp: () => void;
+  multiplayer?: {
+    isConnected: boolean;
+    onlineCount: number;
+    identity: LocalPlayerIdentity | null;
+    remotePlayers: RemotePlayer[];
+  };
 }
 
 export const HUD: React.FC<HUDProps> = ({
@@ -39,7 +47,8 @@ export const HUD: React.FC<HUDProps> = ({
   isMuted,
   toggleMute,
   onReset,
-  onOpenHelp
+  onOpenHelp,
+  multiplayer
 }) => {
   // Horizon Pitch & Roll transforms
   const pitchOffsetPx = (telemetry.pitchDeg || 0) * 3.5;
@@ -48,14 +57,16 @@ export const HUD: React.FC<HUDProps> = ({
   // Compass Heading formatted
   const headingFormatted = String(Math.round(telemetry.yawDeg)).padStart(3, '0');
 
+  const pilotsCount = multiplayer ? multiplayer.onlineCount : 1;
+
   return (
     <div className="absolute inset-0 pointer-events-none select-none flex flex-col justify-between p-4 z-20 overflow-hidden font-mono">
       {/* ========================================================================= */}
       {/* TOP BAR: COMPASS HEADING & UTILITY ACTIONS                                */}
       {/* ========================================================================= */}
       <div className="flex items-start justify-between w-full">
-        {/* Left Status: Flight Status / Gear */}
-        <div className="flex flex-col gap-1 bg-slate-900/80 backdrop-blur-md px-3.5 py-2 rounded-xl border border-sky-500/30 text-xs shadow-xl">
+        {/* Left Status: Flight Status / Gear & Multiplayer */}
+        <div className="flex flex-col gap-1.5 bg-slate-900/80 backdrop-blur-md px-3.5 py-2.5 rounded-xl border border-sky-500/30 text-xs shadow-xl">
           <div className="flex items-center gap-2">
             <span className="text-slate-400">STATE:</span>
             <span className={`font-bold ${telemetry.isGrounded ? 'text-amber-400' : 'text-emerald-400'}`}>
@@ -66,6 +77,29 @@ export const HUD: React.FC<HUDProps> = ({
             <span className="text-slate-400">CAMERA:</span>
             <span className="text-sky-300 font-semibold uppercase">{cameraMode}</span>
           </div>
+
+          {/* Multiplayer LAN / Room Indicator */}
+          {multiplayer && (
+            <div className="pt-1.5 border-t border-slate-700/60 flex flex-col gap-1">
+              <div className="flex items-center gap-1.5">
+                <Radio className={`w-3.5 h-3.5 ${multiplayer.isConnected ? 'text-emerald-400 animate-pulse' : 'text-amber-400'}`} />
+                <span className="text-slate-400">LAN:</span>
+                <span className={`font-bold flex items-center gap-1 ${multiplayer.isConnected ? 'text-emerald-400' : 'text-amber-400'}`}>
+                  <Users className="w-3 h-3 inline" />
+                  {multiplayer.isConnected ? `${pilotsCount} PILOT${pilotsCount > 1 ? 'S' : ''}` : 'CONNECTING...'}
+                </span>
+              </div>
+              {multiplayer.identity && (
+                <div className="flex items-center gap-1.5 text-[11px]">
+                  <span
+                    className="w-2.5 h-2.5 rounded-full border border-white/40"
+                    style={{ backgroundColor: multiplayer.identity.accentColor }}
+                  />
+                  <span className="text-white font-bold">{multiplayer.identity.callsign}</span>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Center: Compass Heading Ribbon */}

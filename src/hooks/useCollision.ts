@@ -1,6 +1,8 @@
 import { useCallback } from 'react';
 import * as THREE from 'three';
-import { MountainHazard, RunwayZone } from '../types/flight';
+import { MountainHazard, RunwayZone, RemotePlayer } from '../types/flight';
+
+export const PLANE_COLLISION_RADIUS = 3.2; // meters (plane wingspan is ~7.6m, radius 3.2m)
 
 export const RUNWAYS: RunwayZone[] = [
   {
@@ -178,10 +180,39 @@ export function useCollision() {
     return { crashed: false, reason: null };
   }, [getGroundInfo]);
 
+  // Plane-to-plane mid-air & ground collision check
+  const checkPlaneCollisions = useCallback((
+    pos: THREE.Vector3,
+    remotePlayers: RemotePlayer[]
+  ): { crashed: boolean; reason: string | null; hitPlayerId?: string; hitPlayerName?: string } => {
+    const radiusSq = PLANE_COLLISION_RADIUS * PLANE_COLLISION_RADIUS;
+
+    for (const player of remotePlayers) {
+      if (player.isCrashed) continue;
+
+      const dx = pos.x - player.position[0];
+      const dy = pos.y - player.position[1];
+      const dz = pos.z - player.position[2];
+      const distSq = dx * dx + dy * dy + dz * dz;
+
+      if (distSq <= radiusSq) {
+        return {
+          crashed: true,
+          reason: `Mid-Air Collision: Crashed into ${player.callsign}!`,
+          hitPlayerId: player.id,
+          hitPlayerName: player.callsign
+        };
+      }
+    }
+
+    return { crashed: false, reason: null };
+  }, []);
+
   return {
     runways: RUNWAYS,
     mountains: MOUNTAIN_HAZARDS,
     getGroundInfo,
-    checkCollision
+    checkCollision,
+    checkPlaneCollisions
   };
 }

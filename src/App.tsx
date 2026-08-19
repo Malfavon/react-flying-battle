@@ -4,13 +4,14 @@ import { useFlightControls } from './hooks/useFlightControls';
 import { useFlightPhysics } from './hooks/useFlightPhysics';
 import { useCollision } from './hooks/useCollision';
 import { useAudioEngine } from './hooks/useAudioEngine';
+import { useMultiplayer } from './hooks/useMultiplayer';
 import { WorldScene } from './components/3d/WorldScene';
 import { HUD } from './components/ui/HUD';
 import { ControlsGuide } from './components/ui/ControlsGuide';
 import { StartModal } from './components/ui/StartModal';
 import { LandingModal } from './components/ui/LandingModal';
 import { CrashModal } from './components/ui/CrashModal';
-import { FlightTelemetry, ControlInputs } from './types/flight';
+import { FlightTelemetry, ControlInputs, RemotePlayer } from './types/flight';
 import * as THREE from 'three';
 
 // Sub-component inside Canvas to run physics loop at RAF rate
@@ -19,22 +20,32 @@ const FlightPhysicsLoop: React.FC<{
   getInputs: () => ControlInputs;
   getGroundInfo: (pos: THREE.Vector3) => { groundElevation: number; isOnRunway: boolean };
   checkCollision: (pos: THREE.Vector3, vel: THREE.Vector3, rollDeg: number, pitchDeg: number) => { crashed: boolean; reason: string | null };
+  checkPlaneCollisions: (pos: THREE.Vector3, remotePlayers: RemotePlayer[]) => { crashed: boolean; reason: string | null };
   triggerCrash: (reason: string) => void;
   playTouchdownSfx: () => void;
   playCrashSfx: () => void;
   updateAudio: (throttle: number, speedKnots: number, isStalling: boolean, isCrashed: boolean, isGrounded: boolean) => void;
+  broadcastTelemetry: (telemetry: FlightTelemetry, quat: THREE.Quaternion, inputs: ControlInputs) => void;
+  broadcastCrash: (reason: string) => void;
   posRef: React.MutableRefObject<THREE.Vector3>;
+  quatRef: React.MutableRefObject<THREE.Quaternion>;
+  remotePlayersRef: React.MutableRefObject<RemotePlayer[]>;
   isGameActive: boolean;
 }> = ({
   updatePhysics,
   getInputs,
   getGroundInfo,
   checkCollision,
+  checkPlaneCollisions,
   triggerCrash,
   playTouchdownSfx,
   playCrashSfx,
   updateAudio,
+  broadcastTelemetry,
+  broadcastCrash,
   posRef,
+  quatRef,
+  remotePlayersRef,
   isGameActive
 }) => {
   const prevGroundedRef = React.useRef(true);
@@ -73,14 +84,28 @@ const FlightPhysicsLoop: React.FC<{
     }
     prevGroundedRef.current = currentTelemetry.isGrounded;
 
-    // 3. Collision Checks
+    // 3. Terrain / Obstacle Collision Checks
     const colResult = checkCollision(pos, vel, currentTelemetry.rollDeg, currentTelemetry.pitchDeg);
     if (colResult.crashed) {
       playCrashSfx();
       triggerCrash(colResult.reason || 'Impact with obstacle');
+      broadcastCrash(colResult.reason || 'Impact with obstacle');
+      return;
     }
 
-    // 4. Update procedural audio engine
+    // 4. Multiplayer Plane-to-Plane Collision Checks
+    const planeCol = checkPlaneCollisions(pos, remotePlayersRef.current);
+    if (planeCol.crashed) {
+      playCrashSfx();
+      triggerCrash(planeCol.reason || 'Mid-air collision with aircraft');
+      broadcastCrash(planeCol.reason || 'Mid-air collision');
+      return;
+    }
+
+    // 5. Broadcast telemetry to peers over Socket.io
+    broadcastTelemetry(currentTelemetry, quatRef.current, inputs);
+
+    // 6. Update procedural audio engine
     updateAudio(
       currentTelemetry.throttle,
       currentTelemetry.airspeedKnots,
@@ -118,12 +143,25 @@ export function App() {
 
   const {
     getGroundInfo,
-    checkCollision
+    checkCollision,
+    checkPlaneCollisions
   } = useCollision();
+
+  const {
+    isConnected,
+    identity,
+    remotePlayers,
+    remotePlayersRef,
+    onlineCount,
+    broadcastTelemetry,
+    broadcastCrash,
+    broadcastRespawn
+  } = useMultiplayer();
 
   const handleReset = useCallback(() => {
     resetFlight([0, 7.2, 0], 0, 0, 0, false);
-  }, [resetFlight]);
+    broadcastRespawn([0, 7.2, 0]);
+  }, [resetFlight, broadcastRespawn]);
 
   const {
     setThrottle,
@@ -150,18 +188,20 @@ export function App() {
   const handleSpawnRunway = useCallback(() => {
     handleUserInteract();
     resetFlight([0, 7.2, 0], 0, 0, 0, false);
+    broadcastRespawn([0, 7.2, 0]);
     setThrottle(0);
     setIsStartModalOpen(false);
-  }, [handleUserInteract, resetFlight, setThrottle]);
+  }, [handleUserInteract, resetFlight, broadcastRespawn, setThrottle]);
 
   // Handle Scenario Choice: Spawn In Flight (Airborne with 20% throttle)
   const handleSpawnInFlight = useCallback(() => {
     handleUserInteract();
     // Spawn over ocean at 150m (approx 500 ft) heading North, initial speed 28 m/s (~55 knots), 20% throttle
     resetFlight([0, 150, 200], 0, 28, 20, true);
+    broadcastRespawn([0, 150, 200]);
     setThrottle(20);
     setIsStartModalOpen(false);
-  }, [handleUserInteract, resetFlight, setThrottle]);
+  }, [handleUserInteract, resetFlight, broadcastRespawn, setThrottle]);
 
   useEffect(() => {
     window.addEventListener('click', handleUserInteract, { once: true });
@@ -194,6 +234,7 @@ export function App() {
           forwardSpeed={telemetry.airspeedMs}
           isCrashed={telemetry.isCrashed}
           cameraMode={cameraMode}
+          remotePlayers={remotePlayers}
         />
 
         <FlightPhysicsLoop
@@ -201,11 +242,16 @@ export function App() {
           getInputs={getInputs}
           getGroundInfo={getGroundInfo}
           checkCollision={checkCollision}
+          checkPlaneCollisions={checkPlaneCollisions}
           triggerCrash={triggerCrash}
           playTouchdownSfx={playTouchdownSfx}
           playCrashSfx={playCrashSfx}
           updateAudio={updateAudio}
+          broadcastTelemetry={broadcastTelemetry}
+          broadcastCrash={broadcastCrash}
           posRef={posRef}
+          quatRef={quatRef}
+          remotePlayersRef={remotePlayersRef}
           isGameActive={!isStartModalOpen}
         />
       </Canvas>
@@ -223,6 +269,12 @@ export function App() {
         toggleMute={toggleMute}
         onReset={handleReset}
         onOpenHelp={() => setIsHelpOpen(true)}
+        multiplayer={{
+          isConnected,
+          onlineCount,
+          identity,
+          remotePlayers
+        }}
       />
 
       {/* Modals & Dialogs */}

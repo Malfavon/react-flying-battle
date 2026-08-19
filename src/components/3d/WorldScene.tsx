@@ -8,7 +8,8 @@ import { Mountains } from './Mountains';
 import { Clouds } from './Clouds';
 import { CrashParticles } from './CrashParticles';
 import { CameraController } from './CameraController';
-import { CameraMode, FlapStage } from '../../types/flight';
+import { RemoteAirplane } from './RemoteAirplane';
+import { CameraMode, FlapStage, RemotePlayer } from '../../types/flight';
 
 interface WorldSceneProps {
   planePos: [number, number, number];
@@ -22,6 +23,7 @@ interface WorldSceneProps {
   forwardSpeed: number;
   isCrashed: boolean;
   cameraMode: CameraMode;
+  remotePlayers?: RemotePlayer[];
 }
 
 export const WorldScene: React.FC<WorldSceneProps> = ({
@@ -35,7 +37,8 @@ export const WorldScene: React.FC<WorldSceneProps> = ({
   isGrounded,
   forwardSpeed,
   isCrashed,
-  cameraMode
+  cameraMode,
+  remotePlayers = []
 }) => {
   const planeGroupRef = useRef<THREE.Group>(null);
   const planePosVec = new THREE.Vector3(...planePos);
@@ -102,6 +105,15 @@ export const WorldScene: React.FC<WorldSceneProps> = ({
 
       {/* Crash Explosion Debris */}
       {isCrashed && <CrashParticles position={planePos} />}
+
+      {/* Remote Multiplayer Aircraft */}
+      {remotePlayers.map((player) => (
+        <RemoteAirplane
+          key={player.id}
+          player={player}
+          localPos={planePos}
+        />
+      ))}
 
       {/* Dynamic Camera */}
       <CameraController

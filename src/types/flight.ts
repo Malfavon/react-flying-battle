@@ -58,3 +58,31 @@ export interface MountainHazard {
   radius: number;
   height: number;
 }
+
+export interface RemotePlayer {
+  id: string;
+  callsign: string;
+  color: string;
+  accentColor: string;
+  wingColor: string;
+  position: [number, number, number];
+  quaternion: [number, number, number, number]; // [x, y, z, w]
+  throttle: number;
+  flapStage: FlapStage;
+  rollInput: number;
+  pitchInput: number;
+  yawInput: number;
+  forwardSpeed: number;
+  isGrounded: boolean;
+  isCrashed: boolean;
+  crashReason: string | null;
+}
+
+export interface LocalPlayerIdentity {
+  id: string;
+  callsign: string;
+  color: string;
+  accentColor: string;
+  wingColor: string;
+}
+
