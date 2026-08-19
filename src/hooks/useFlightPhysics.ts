@@ -161,8 +161,24 @@ export function useFlightPhysics() {
       if (Math.abs(inputs.pitch) > 0.05) {
         rot.x += inputs.pitch * 1.3 * controlAuthority * dt;
       } else {
-        // Natural aerodynamic stability: nose auto-levels towards 0 (level flight) when key is released!
-        rot.x = THREE.MathUtils.lerp(rot.x, 0, dt * 1.5);
+        // Pilot released pitch controls:
+        if (inputs.throttle < 15 || isStalling) {
+          // Unpowered / low-throttle / stall behavior:
+          // Without engine thrust and airflow, center-of-gravity (forward of center-of-lift)
+          // naturally pulls the nose down toward the ground into a gliding dive.
+          const throttleDeficit = 1.0 - Math.max(0, inputs.throttle / 15.0); // 1.0 at 0% throttle, 0.0 at 15% throttle
+          const targetNoseDownPitch = isStalling ? -0.45 : -0.22; // -25° stall dive or -12.5° glide dive
+          const noseDropSpeed = isStalling ? 1.8 : (0.35 + 0.45 * throttleDeficit);
+          rot.x = THREE.MathUtils.lerp(rot.x, targetNoseDownPitch, dt * noseDropSpeed);
+        } else {
+          // Powered flight (throttle >= 15%):
+          // Aircraft MAINTAINS its cruising / climb / dive pitch attitude!
+          // If pointed up, it continues pointing up and climbing.
+          // Gently damp extreme pitch angles beyond +-60 degrees to prevent tumbling
+          if (Math.abs(rot.x) > 1.05) {
+            rot.x = THREE.MathUtils.lerp(rot.x, Math.sign(rot.x) * 1.05, dt * 1.0);
+          }
+        }
       }
 
       // Roll: D / Right Arrow (roll > 0) tilts right (rot.z < 0), A / Left Arrow (roll < 0) tilts left (rot.z > 0)
@@ -178,11 +194,6 @@ export function useFlightPhysics() {
       const turnRate = (forwardSpeed > 5.0) ? (Math.sin(bankAngle) * 1.6 * controlAuthority) : 0;
       rot.y -= (turnRate + inputs.yaw * 1.2 * controlAuthority) * dt;
 
-      // Stall nose drop (rot.x drops towards dive)
-      if (isStalling) {
-        rot.x = THREE.MathUtils.lerp(rot.x, -0.35, dt * 2.0);
-      }
-
       // Clamp pitch to avoid gimbal flips
       rot.x = THREE.MathUtils.clamp(rot.x, -Math.PI / 2.3, Math.PI / 2.3);
     }
@@ -196,34 +207,50 @@ export function useFlightPhysics() {
 
     // 2. Aerodynamic Drag (Opposes velocity)
     const dynamicPressure = 0.5 * 1.225 * Math.pow(forwardSpeed, 2);
-    const dragMagnitude = dynamicPressure * 16.0 * flapConfig.dragCoeff;
+    // Parasitic drag + flap drag + angle-of-attack induced drag
+    const inducedDragCoeff = Math.abs(rot.x) * 0.15;
+    const totalDragCoeff = flapConfig.dragCoeff + inducedDragCoeff;
+    const dragMagnitude = dynamicPressure * 16.0 * totalDragCoeff;
     const dragForce = totalSpeed > 0.01 ? vel.clone().normalize().negate().multiplyScalar(dragMagnitude) : new THREE.Vector3();
 
     // 3. Gravity (Always pulls downward)
     const gravityForce = new THREE.Vector3(0, -weight, 0);
 
     // 4. Aerodynamic Lift:
-    // Balances gravity in level flight, increases when pulling UP (S/Down), decreases when pushing DOWN (W/Up)
+    // Dynamic lift scales with airspeed squared (dynamic pressure), bank angle, flap settings, and pitch angle/input
     let liftForce = new THREE.Vector3();
-    if (!isStalling && forwardSpeed > 6.0) {
-      const speedRatio = Math.min(1.0, forwardSpeed / stallSpeedMs);
-      const baseLift = weight * Math.max(0, Math.cos(rot.z)) * speedRatio;
-      const flapExtra = (flapConfig.liftCoeff - 1.0) * weight * 0.4;
-      const pitchLift = inputs.pitch * weight * 0.9;
-      const totalLiftMag = Math.max(0, baseLift + flapExtra + pitchLift);
-      liftForce = up.clone().multiplyScalar(totalLiftMag);
+    if (!isStalling && forwardSpeed > 4.0) {
+      const cruiseSpeedMs = 26.0; // ~50 knots reference cruise speed where L = W in level flight
+      const speedFactor = Math.min(1.4, Math.pow(forwardSpeed / cruiseSpeedMs, 2));
+      const bankFactor = Math.max(0, Math.cos(rot.z));
+      const flapMultiplier = flapConfig.liftCoeff;
+      const pitchAngleBonus = THREE.MathUtils.clamp(rot.x * 0.5, -0.3, 0.6);
+      const pitchInputBonus = inputs.pitch * 0.4;
+      const totalLiftMag = weight * speedFactor * bankFactor * flapMultiplier * (1.0 + pitchAngleBonus + pitchInputBonus);
+      liftForce = up.clone().multiplyScalar(Math.max(0, totalLiftMag));
     } else if (isStalling) {
-      liftForce = up.clone().multiplyScalar(weight * 0.25);
+      liftForce = up.clone().multiplyScalar(weight * 0.2);
     }
 
     // Acceleration & Velocity integration
     const forces = new THREE.Vector3().add(thrustForce).add(liftForce).add(dragForce).add(gravityForce);
     vel.addScaledVector(forces.divideScalar(mass), dt);
 
-    // Smooth flight path alignment with forward heading
-    if (!isGrounded && totalSpeed > 5.0) {
-      const targetVel = forward.clone().multiplyScalar(totalSpeed);
-      vel.lerp(targetVel, dt * 3.0);
+    // Aerodynamic flight path convergence:
+    // Airflow over the aerodynamic surfaces naturally converges the aircraft's horizontal heading
+    // while PRESERVING physical vertical sink / descent under gravity.
+    if (!isGrounded && totalSpeed > 3.0) {
+      const horizForward = new THREE.Vector3(forward.x, 0, forward.z).normalize();
+      const currentHorizSpeed = Math.sqrt(vel.x * vel.x + vel.z * vel.z);
+      const targetHorizVel = horizForward.multiplyScalar(currentHorizSpeed);
+
+      vel.x = THREE.MathUtils.lerp(vel.x, targetHorizVel.x, dt * 2.5);
+      vel.z = THREE.MathUtils.lerp(vel.z, targetHorizVel.z, dt * 2.5);
+
+      // Pitch flight path coupling:
+      // High-speed airflow guides vertical velocity along climb / dive orientation
+      const targetPitchVelY = forward.y * totalSpeed;
+      vel.y = THREE.MathUtils.lerp(vel.y, targetPitchVelY, dt * 1.8);
     }
 
     // 5. Ground Wheel Interaction & Takeoff Transition
