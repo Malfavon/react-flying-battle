@@ -202,13 +202,13 @@ export function App() {
     setIsStartModalOpen(false);
   }, [handleUserInteract, resetFlight, broadcastRespawn, setThrottle]);
 
-  // Handle Scenario Choice: Spawn In Flight (Airborne with 20% throttle)
+  // Handle Scenario Choice: Spawn In Flight (Airborne with 50% cruise throttle)
   const handleSpawnInFlight = useCallback(() => {
     handleUserInteract();
-    // Spawn over ocean at 150m (approx 500 ft) heading North, initial speed 28 m/s (~55 knots), 20% throttle
-    resetFlight([0, 150, 200], 0, 28, 20, true);
-    broadcastRespawn([0, 150, 200]);
-    setThrottle(20);
+    // Spawn over ocean at 180m (approx 600 ft) heading North, initial speed 48 m/s (~93 knots), 50% cruise throttle
+    resetFlight([0, 180, 200], 0, 48, 50, true);
+    broadcastRespawn([0, 180, 200]);
+    setThrottle(50);
     setIsStartModalOpen(false);
   }, [handleUserInteract, resetFlight, broadcastRespawn, setThrottle]);
 

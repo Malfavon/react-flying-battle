@@ -8,24 +8,24 @@ export const FLAP_CONFIGS: Record<FlapStage, FlapConfiguration> = {
     label: '0° Clean (Cruise)',
     angleDeg: 0,
     liftCoeff: 1.0,
-    dragCoeff: 0.15,
-    stallSpeedKnots: 28
+    dragCoeff: 0.12,
+    stallSpeedKnots: 65
   },
   1: {
     stage: 1,
     label: '15° Takeoff / Appr',
     angleDeg: 15,
     liftCoeff: 1.35,
-    dragCoeff: 0.22,
-    stallSpeedKnots: 20
+    dragCoeff: 0.18,
+    stallSpeedKnots: 55
   },
   2: {
     stage: 2,
     label: '30° Landing',
     angleDeg: 30,
     liftCoeff: 1.70,
-    dragCoeff: 0.38,
-    stallSpeedKnots: 15
+    dragCoeff: 0.28,
+    stallSpeedKnots: 45
   }
 };
 
@@ -143,45 +143,56 @@ export function useFlightPhysics() {
     }
 
     // Control surfaces authority scales with forward speed
-    const controlAuthority = Math.min(1.3, Math.max(0.2, forwardSpeed / 18.0));
+    const controlAuthority = Math.min(1.1, Math.max(0.18, forwardSpeed / 42.0));
 
     // Steering and Rotations
     if (isGrounded) {
       // Ground pitch rotation (S / Down Arrow tilts nose UP: rot.x increases)
-      rot.x = THREE.MathUtils.clamp(rot.x + inputs.pitch * 1.2 * dt, -0.05, 0.25);
+      rot.x = THREE.MathUtils.clamp(rot.x + inputs.pitch * 0.55 * dt, -0.04, 0.22);
       // Suspension levels roll on ground
       rot.z = THREE.MathUtils.lerp(rot.z, 0, dt * 10.0);
       // Ground nose-wheel steering: Left turns Left (rot.y increases), Right turns Right (rot.y decreases)
       const groundSteer = inputs.yaw !== 0 ? inputs.yaw : inputs.roll;
-      rot.y -= groundSteer * 1.8 * dt;
+      rot.y -= groundSteer * 0.95 * dt;
     } else {
       // In-flight pitch control:
       // S / Down Arrow (+pitch): rot.x increases (nose points UP to climb)
       // W / Up Arrow (-pitch): rot.x decreases (nose points DOWN to dive)
       if (Math.abs(inputs.pitch) > 0.05) {
-        rot.x += inputs.pitch * 1.3 * controlAuthority * dt;
+        rot.x += inputs.pitch * 0.65 * controlAuthority * dt;
       } else {
-        // Natural aerodynamic stability: nose auto-levels towards 0 (level flight) when key is released!
-        rot.x = THREE.MathUtils.lerp(rot.x, 0, dt * 1.5);
+        // Pilot released pitch controls:
+        if (inputs.throttle < 15 || isStalling) {
+          // Unpowered / low-throttle / stall behavior:
+          // Without engine thrust and airflow, center-of-gravity (forward of center-of-lift)
+          // naturally pulls the nose down toward the ground into a gliding dive.
+          const throttleDeficit = 1.0 - Math.max(0, inputs.throttle / 15.0); // 1.0 at 0% throttle, 0.0 at 15% throttle
+          const targetNoseDownPitch = isStalling ? -0.45 : -0.22; // -25° stall dive or -12.5° glide dive
+          const noseDropSpeed = isStalling ? 1.6 : (0.3 + 0.4 * throttleDeficit);
+          rot.x = THREE.MathUtils.lerp(rot.x, targetNoseDownPitch, dt * noseDropSpeed);
+        } else {
+          // Powered flight (throttle >= 15%):
+          // Aircraft MAINTAINS its cruising / climb / dive pitch attitude!
+          // If pointed up, it continues pointing up and climbing.
+          // Gently damp extreme pitch angles beyond +-60 degrees to prevent tumbling
+          if (Math.abs(rot.x) > 1.05) {
+            rot.x = THREE.MathUtils.lerp(rot.x, Math.sign(rot.x) * 1.05, dt * 1.0);
+          }
+        }
       }
 
       // Roll: D / Right Arrow (roll > 0) tilts right (rot.z < 0), A / Left Arrow (roll < 0) tilts left (rot.z > 0)
-      rot.z -= inputs.roll * 2.8 * controlAuthority * dt;
+      rot.z -= inputs.roll * 1.35 * controlAuthority * dt;
       if (Math.abs(inputs.roll) < 0.05) {
-        rot.z = THREE.MathUtils.lerp(rot.z, 0, dt * 1.0);
+        rot.z = THREE.MathUtils.lerp(rot.z, 0, dt * 0.8);
       }
 
       // Coordinated banking turn:
       // When rolling LEFT (rot.z > 0, bankAngle < 0), turn left (rot.y increases).
       // When rolling RIGHT (rot.z < 0, bankAngle > 0), turn right (rot.y decreases).
       const bankAngle = -rot.z;
-      const turnRate = (forwardSpeed > 5.0) ? (Math.sin(bankAngle) * 1.6 * controlAuthority) : 0;
-      rot.y -= (turnRate + inputs.yaw * 1.2 * controlAuthority) * dt;
-
-      // Stall nose drop (rot.x drops towards dive)
-      if (isStalling) {
-        rot.x = THREE.MathUtils.lerp(rot.x, -0.35, dt * 2.0);
-      }
+      const turnRate = (forwardSpeed > 10.0) ? (Math.sin(bankAngle) * 0.85 * controlAuthority) : 0;
+      rot.y -= (turnRate + inputs.yaw * 0.65 * controlAuthority) * dt;
 
       // Clamp pitch to avoid gimbal flips
       rot.x = THREE.MathUtils.clamp(rot.x, -Math.PI / 2.3, Math.PI / 2.3);
@@ -196,59 +207,83 @@ export function useFlightPhysics() {
 
     // 2. Aerodynamic Drag (Opposes velocity)
     const dynamicPressure = 0.5 * 1.225 * Math.pow(forwardSpeed, 2);
-    const dragMagnitude = dynamicPressure * 16.0 * flapConfig.dragCoeff;
+    // Parasitic drag + flap drag + angle-of-attack induced drag
+    const inducedDragCoeff = Math.abs(rot.x) * 0.15;
+    const totalDragCoeff = flapConfig.dragCoeff + inducedDragCoeff;
+    const dragMagnitude = dynamicPressure * 16.0 * totalDragCoeff;
     const dragForce = totalSpeed > 0.01 ? vel.clone().normalize().negate().multiplyScalar(dragMagnitude) : new THREE.Vector3();
 
     // 3. Gravity (Always pulls downward)
     const gravityForce = new THREE.Vector3(0, -weight, 0);
 
     // 4. Aerodynamic Lift:
-    // Balances gravity in level flight, increases when pulling UP (S/Down), decreases when pushing DOWN (W/Up)
+    // Dynamic lift scales with airspeed squared (dynamic pressure), bank angle, flap settings, and pitch angle/input
     let liftForce = new THREE.Vector3();
-    if (!isStalling && forwardSpeed > 6.0) {
-      const speedRatio = Math.min(1.0, forwardSpeed / stallSpeedMs);
-      const baseLift = weight * Math.max(0, Math.cos(rot.z)) * speedRatio;
-      const flapExtra = (flapConfig.liftCoeff - 1.0) * weight * 0.4;
-      const pitchLift = inputs.pitch * weight * 0.9;
-      const totalLiftMag = Math.max(0, baseLift + flapExtra + pitchLift);
-      liftForce = up.clone().multiplyScalar(totalLiftMag);
+    if (!isStalling && forwardSpeed > 8.0) {
+      const cruiseSpeedMs = 45.0; // ~87.5 knots reference cruise speed where L = W in level flight
+      const speedFactor = Math.min(1.5, Math.pow(forwardSpeed / cruiseSpeedMs, 2));
+      const bankFactor = Math.max(0, Math.cos(rot.z));
+      const flapMultiplier = flapConfig.liftCoeff;
+      const pitchAngleBonus = THREE.MathUtils.clamp(rot.x * 0.5, -0.3, 0.6);
+      const pitchInputBonus = inputs.pitch * 0.4;
+      const totalLiftMag = weight * speedFactor * bankFactor * flapMultiplier * (1.0 + pitchAngleBonus + pitchInputBonus);
+      liftForce = up.clone().multiplyScalar(Math.max(0, totalLiftMag));
     } else if (isStalling) {
-      liftForce = up.clone().multiplyScalar(weight * 0.25);
+      liftForce = up.clone().multiplyScalar(weight * 0.2);
     }
 
     // Acceleration & Velocity integration
     const forces = new THREE.Vector3().add(thrustForce).add(liftForce).add(dragForce).add(gravityForce);
     vel.addScaledVector(forces.divideScalar(mass), dt);
 
-    // Smooth flight path alignment with forward heading
-    if (!isGrounded && totalSpeed > 5.0) {
-      const targetVel = forward.clone().multiplyScalar(totalSpeed);
-      vel.lerp(targetVel, dt * 3.0);
+    // Aerodynamic flight path convergence:
+    // Airflow over the aerodynamic surfaces naturally converges the aircraft's horizontal heading
+    // while PRESERVING physical vertical sink / descent under gravity.
+    if (!isGrounded && totalSpeed > 3.0) {
+      const horizForward = new THREE.Vector3(forward.x, 0, forward.z).normalize();
+      const currentHorizSpeed = Math.sqrt(vel.x * vel.x + vel.z * vel.z);
+      const targetHorizVel = horizForward.multiplyScalar(currentHorizSpeed);
+
+      vel.x = THREE.MathUtils.lerp(vel.x, targetHorizVel.x, dt * 2.5);
+      vel.z = THREE.MathUtils.lerp(vel.z, targetHorizVel.z, dt * 2.5);
+
+      // Pitch flight path coupling:
+      // High-speed airflow guides vertical velocity along climb / dive orientation
+      const targetPitchVelY = forward.y * totalSpeed;
+      vel.y = THREE.MathUtils.lerp(vel.y, targetPitchVelY, dt * 1.8);
     }
 
     // 5. Ground Wheel Interaction & Takeoff Transition
     if (isGrounded) {
       const horizontalSpeed = Math.max(0, vel.dot(groundForward));
       vel.copy(groundForward.clone().multiplyScalar(horizontalSpeed));
-      vel.multiplyScalar(Math.max(0, 1 - 0.01 * dt * 60));
 
-      // Wheel Brakes
+      // Realistic rolling friction on runway (tarmac rolling resistance)
+      const rollingResistance = 0.03 * Math.max(0, weight - liftForce.y);
+      const rollingDecel = (rollingResistance / mass) * dt;
+      const curSpeed = vel.length();
+      if (curSpeed > 0.01) {
+        vel.setLength(Math.max(0, curSpeed - rollingDecel));
+      }
+
+      // Wheel Brakes (Active when holding Space or tapping Brake button)
       if (inputs.brakes) {
-        const brakeDecel = 14.0 * dt;
-        const curSpeed = vel.length();
-        if (curSpeed > 0.01) {
-          vel.setLength(Math.max(0, curSpeed - brakeDecel));
+        const brakeDecel = 18.0 * dt;
+        const curSpd = vel.length();
+        if (curSpd > 0.01) {
+          vel.setLength(Math.max(0, curSpd - brakeDecel));
         }
       }
 
       // Takeoff Liftoff Trigger:
-      // When airspeed is >= 24 knots and either lift > gravity or pilot pulls UP (S / Down Arrow)
-      const liftAboveWeight = (liftForce.y) > weight * 0.8;
-      const pilotPullingUp = airspeedKnots >= 24 && (inputs.pitch > 0.1 || rot.x > 0.04);
-      const highSpeedTakeoff = airspeedKnots >= 42;
+      // Requires at least 80 knots airspeed and either pilot pulls UP (S / Down Arrow) or rotated nose,
+      // or high-speed auto-liftoff (>= 105 knots)
+      const liftAboveWeight = (liftForce.y) > weight * 0.85;
+      const pilotPullingUp = airspeedKnots >= 80 && (inputs.pitch > 0.08 || rot.x > 0.03);
+      const highSpeedTakeoff = airspeedKnots >= 105;
 
-      if (liftAboveWeight || pilotPullingUp || highSpeedTakeoff) {
-        vel.y = Math.max(2.5, (forwardSpeed / 20.0) * 4.0 + Math.max(0, inputs.pitch) * 3.5);
+      if ((pilotPullingUp && liftAboveWeight) || highSpeedTakeoff) {
+        vel.y = Math.max(2.0, (forwardSpeed / 40.0) * 3.5 + Math.max(0, inputs.pitch) * 3.0);
         pos.y = gearHeight + 0.2;
       } else {
         vel.y = 0;
