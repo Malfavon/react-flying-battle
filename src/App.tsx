@@ -11,6 +11,8 @@ import { ControlsGuide } from './components/ui/ControlsGuide';
 import { StartModal } from './components/ui/StartModal';
 import { LandingModal } from './components/ui/LandingModal';
 import { CrashModal } from './components/ui/CrashModal';
+import { OrientationPrompt } from './components/ui/OrientationPrompt';
+import { useFullscreen } from './hooks/useFullscreen';
 import { FlightTelemetry, ControlInputs, RemotePlayer } from './types/flight';
 import * as THREE from 'three';
 
@@ -158,6 +160,12 @@ export function App() {
     broadcastRespawn
   } = useMultiplayer();
 
+  const {
+    isFullscreen,
+    enterFullscreen,
+    toggleFullscreen
+  } = useFullscreen();
+
   const handleReset = useCallback(() => {
     resetFlight([0, 7.2, 0], 0, 0, 0, false);
     broadcastRespawn([0, 7.2, 0]);
@@ -170,7 +178,8 @@ export function App() {
     setIsBraking,
     cameraMode,
     cycleCamera,
-    getInputs
+    getInputs,
+    setVirtualAxes
   } = useFlightControls({
     onReset: handleReset,
     onMuteToggle: toggleMute,
@@ -263,12 +272,15 @@ export function App() {
         setFlapStage={setFlapStage}
         isBraking={isBraking}
         setIsBraking={setIsBraking}
+        setVirtualAxes={setVirtualAxes}
         cameraMode={cameraMode}
         cycleCamera={cycleCamera}
         isMuted={isMuted}
         toggleMute={toggleMute}
         onReset={handleReset}
         onOpenHelp={() => setIsHelpOpen(true)}
+        isFullscreen={isFullscreen}
+        onToggleFullscreen={toggleFullscreen}
         multiplayer={{
           isConnected,
           onlineCount,
@@ -282,6 +294,7 @@ export function App() {
         isOpen={isStartModalOpen}
         onSpawnRunway={handleSpawnRunway}
         onSpawnInFlight={handleSpawnInFlight}
+        onEnterFullscreen={enterFullscreen}
       />
       <ControlsGuide isOpen={isHelpOpen} onClose={() => setIsHelpOpen(false)} />
       <LandingModal
@@ -290,6 +303,7 @@ export function App() {
         onReset={handleReset}
       />
       <CrashModal telemetry={telemetry} onRespawn={handleReset} />
+      <OrientationPrompt onEnterFullscreen={enterFullscreen} />
     </div>
   );
 }

@@ -38,7 +38,15 @@ export const CameraController: React.FC<CameraControllerProps> = ({
         new THREE.Euler(pitch * 0.45, yaw, 0, 'YXZ')
       );
 
-      const camOffset = new THREE.Vector3(0, 3.8 + speedOffset * 0.15, 11.5 + speedOffset);
+      // Adaptive framing for narrow/mobile viewports to prevent over-zooming
+      const aspect = (camera as THREE.PerspectiveCamera).aspect || 1.6;
+      const aspectMultiplier = aspect < 1.2 ? Math.min(1.6, 1.2 / Math.max(0.6, aspect)) : 1.0;
+
+      const camOffset = new THREE.Vector3(
+        0,
+        (3.8 + speedOffset * 0.15) * aspectMultiplier,
+        (11.5 + speedOffset) * aspectMultiplier
+      );
       camOffset.applyQuaternion(followQuat);
 
       const targetCamPos = planePos.clone().add(camOffset);
