@@ -170,7 +170,8 @@ export function App() {
     setIsBraking,
     cameraMode,
     cycleCamera,
-    getInputs
+    getInputs,
+    setVirtualAxes
   } = useFlightControls({
     onReset: handleReset,
     onMuteToggle: toggleMute,
@@ -263,6 +264,7 @@ export function App() {
         setFlapStage={setFlapStage}
         isBraking={isBraking}
         setIsBraking={setIsBraking}
+        setVirtualAxes={setVirtualAxes}
         cameraMode={cameraMode}
         cycleCamera={cycleCamera}
         isMuted={isMuted}

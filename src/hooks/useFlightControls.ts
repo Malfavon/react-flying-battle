@@ -25,6 +25,17 @@ export function useFlightControls({
   const flapStageRef = useRef<FlapStage>(0);
   const isBrakingRef = useRef<boolean>(false);
   const keysPressed = useRef<{ [key: string]: boolean }>({});
+  const virtualAxesRef = useRef<{ pitch: number; roll: number; yaw: number }>({
+    pitch: 0,
+    roll: 0,
+    yaw: 0
+  });
+
+  const setVirtualAxes = useCallback((axes: { pitch?: number; roll?: number; yaw?: number }) => {
+    if (axes.pitch !== undefined) virtualAxesRef.current.pitch = axes.pitch;
+    if (axes.roll !== undefined) virtualAxesRef.current.roll = axes.roll;
+    if (axes.yaw !== undefined) virtualAxesRef.current.yaw = axes.yaw;
+  }, []);
 
   const setThrottle = useCallback((val: number | ((prev: number) => number)) => {
     setThrottleState((prev) => {
@@ -123,26 +134,30 @@ export function useFlightControls({
   // Calculate normalized input axes in real time
   const getInputs = useCallback((): ControlInputs => {
     const keys = keysPressed.current;
+    const virtual = virtualAxesRef.current;
     
     // Inverted flight controls convention:
     // S / Down Arrow: Pull stick back -> Pitch UP / Takeoff (+1.0)
     // W / Up Arrow: Push stick forward -> Pitch DOWN / Dive (-1.0)
-    let pitch = 0;
+    let pitch = virtual.pitch;
     if (keys['KeyS'] || keys['ArrowDown']) pitch += 1.0;
     if (keys['KeyW'] || keys['ArrowUp']) pitch -= 1.0;
+    pitch = Math.max(-1, Math.min(1, pitch));
 
     // Roll: D / ArrowRight = Roll Right (+1), A / ArrowLeft = Roll Left (-1)
-    let roll = 0;
+    let roll = virtual.roll;
     if (keys['KeyD'] || keys['ArrowRight']) roll += 1.0;
     if (keys['KeyA'] || keys['ArrowLeft']) roll -= 1.0;
+    roll = Math.max(-1, Math.min(1, roll));
 
     // Yaw: E = Yaw Right (+1), Q = Yaw Left (-1)
-    let yaw = 0;
+    let yaw = virtual.yaw;
     if (keys['KeyE']) yaw += 1.0;
     if (keys['KeyQ']) yaw -= 1.0;
+    yaw = Math.max(-1, Math.min(1, yaw));
 
-    // Coordinated bank turning
-    if (yaw === 0 && Math.abs(roll) > 0.1) {
+    // Coordinated bank turning if no manual yaw input
+    if (Math.abs(yaw) < 0.05 && Math.abs(roll) > 0.1) {
       yaw = roll * 0.35;
     }
 
@@ -166,6 +181,7 @@ export function useFlightControls({
     cameraMode,
     setCameraMode,
     cycleCamera,
-    getInputs
+    getInputs,
+    setVirtualAxes
   };
 }
