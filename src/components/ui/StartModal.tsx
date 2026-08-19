@@ -82,7 +82,7 @@ export const StartModal: React.FC<StartModalProps> = ({
             </div>
           </button>
 
-          {/* Option 2: Spawn In Flight (20% Throttle) */}
+          {/* Option 2: Spawn In Flight (50% Cruise Throttle) */}
           <button
             onClick={handleInFlight}
             className="group flex flex-col justify-between p-4 rounded-xl bg-slate-800/60 hover:bg-emerald-950/50 border border-slate-700/60 hover:border-emerald-500 transition-all duration-200 text-left hover:scale-[1.02] shadow-md hover:shadow-emerald-500/20"
@@ -100,7 +100,7 @@ export const StartModal: React.FC<StartModalProps> = ({
                 SPAWN IN FLIGHT
               </h3>
               <p className="text-xs text-slate-400 mt-1">
-                Spawn airborne at 500 ft over ocean cruising at 20% throttle.
+                Spawn airborne at 600 ft over ocean cruising at 50% throttle (~93 KT).
               </p>
             </div>
 
