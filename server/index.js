@@ -2,16 +2,38 @@ import http from 'http';
 import { Server } from 'socket.io';
 
 const PORT = process.env.PORT || 3001;
+const allowedOrigins = process.env.CLIENT_ORIGIN
+  ? process.env.CLIENT_ORIGIN.split(',').map((s) => s.trim())
+  : '*';
 
 const server = http.createServer((req, res) => {
-  res.writeHead(200, { 'Content-Type': 'application/json' });
-  res.end(JSON.stringify({ status: 'Flight Simulator Socket.io Server Active', players: players.size }));
+  // Health check & status endpoint for Render/Railway/Fly.io uptime monitors
+  if (req.url === '/health' || req.url === '/') {
+    res.writeHead(200, {
+      'Content-Type': 'application/json',
+      'Access-Control-Allow-Origin': '*'
+    });
+    res.end(
+      JSON.stringify({
+        status: 'ok',
+        service: 'Flight Simulator Socket.io Server',
+        pilotsOnline: players.size,
+        uptimeSeconds: Math.floor(process.uptime()),
+        timestamp: new Date().toISOString()
+      })
+    );
+    return;
+  }
+
+  res.writeHead(404, { 'Content-Type': 'application/json' });
+  res.end(JSON.stringify({ error: 'Not found' }));
 });
 
 const io = new Server(server, {
   cors: {
-    origin: '*',
-    methods: ['GET', 'POST']
+    origin: allowedOrigins,
+    methods: ['GET', 'POST'],
+    credentials: true
   },
   pingInterval: 10000,
   pingTimeout: 5000
@@ -200,6 +222,27 @@ server.listen(PORT, '0.0.0.0', () => {
   console.log(`=========================================`);
   console.log(`🚀 Flight Simulator Socket.io Server`);
   console.log(`📡 Listening on: http://0.0.0.0:${PORT}`);
-  console.log(`🌐 Ready for Local & LAN Multiplayer`);
+  console.log(`🌐 Ready for Production & Multiplayer`);
   console.log(`=========================================`);
 });
+
+// Graceful shutdown handling for cloud platforms (Render / Railway / Fly.io / Kubernetes)
+const handleShutdown = (signal) => {
+  console.log(`\n[Server] Received ${signal}. Shutting down gracefully...`);
+  io.close(() => {
+    console.log('[Server] Socket.io connections closed.');
+    server.close(() => {
+      console.log('[Server] HTTP server closed. Exiting process.');
+      process.exit(0);
+    });
+  });
+
+  // Force close after 5 seconds if connections hang
+  setTimeout(() => {
+    console.error('[Server] Forced shutdown timeout reached.');
+    process.exit(1);
+  }, 5000);
+};
+
+process.on('SIGTERM', () => handleShutdown('SIGTERM'));
+process.on('SIGINT', () => handleShutdown('SIGINT'));
