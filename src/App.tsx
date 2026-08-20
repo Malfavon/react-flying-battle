@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { useFlightControls } from './hooks/useFlightControls';
 import { useFlightPhysics } from './hooks/useFlightPhysics';
@@ -6,6 +6,7 @@ import { useCollision } from './hooks/useCollision';
 import { useAudioEngine } from './hooks/useAudioEngine';
 import { useMultiplayer } from './hooks/useMultiplayer';
 import { WorldScene } from './components/3d/WorldScene';
+import { BulletsHandle } from './components/3d/Bullets';
 import { HUD } from './components/ui/HUD';
 import { ControlsGuide } from './components/ui/ControlsGuide';
 import { StartModal } from './components/ui/StartModal';
@@ -13,10 +14,10 @@ import { LandingModal } from './components/ui/LandingModal';
 import { CrashModal } from './components/ui/CrashModal';
 import { OrientationPrompt } from './components/ui/OrientationPrompt';
 import { useFullscreen } from './hooks/useFullscreen';
-import { FlightTelemetry, ControlInputs, RemotePlayer } from './types/flight';
+import { FlightTelemetry, ControlInputs, RemotePlayer, Bullet, DamageEvent } from './types/flight';
 import * as THREE from 'three';
 
-// Sub-component inside Canvas to run physics loop at RAF rate
+// Sub-component inside Canvas to run physics & combat loop at RAF rate
 const FlightPhysicsLoop: React.FC<{
   updatePhysics: (delta: number, inputs: ControlInputs, groundElevation: number, isOnRunway: boolean) => FlightTelemetry;
   getInputs: () => ControlInputs;
@@ -26,12 +27,16 @@ const FlightPhysicsLoop: React.FC<{
   triggerCrash: (reason: string) => void;
   playTouchdownSfx: () => void;
   playCrashSfx: () => void;
+  playShootSfx: () => void;
   updateAudio: (throttle: number, speedKnots: number, isStalling: boolean, isCrashed: boolean, isGrounded: boolean) => void;
   broadcastTelemetry: (telemetry: FlightTelemetry, quat: THREE.Quaternion, inputs: ControlInputs) => void;
   broadcastCrash: (reason: string) => void;
+  broadcastShoot: (bullet: Bullet) => void;
   posRef: React.MutableRefObject<THREE.Vector3>;
   quatRef: React.MutableRefObject<THREE.Quaternion>;
   remotePlayersRef: React.MutableRefObject<RemotePlayer[]>;
+  bulletsRef: React.RefObject<BulletsHandle>;
+  localId?: string;
   isGameActive: boolean;
 }> = ({
   updatePhysics,
@@ -42,15 +47,20 @@ const FlightPhysicsLoop: React.FC<{
   triggerCrash,
   playTouchdownSfx,
   playCrashSfx,
+  playShootSfx,
   updateAudio,
   broadcastTelemetry,
   broadcastCrash,
+  broadcastShoot,
   posRef,
   quatRef,
   remotePlayersRef,
+  bulletsRef,
+  localId,
   isGameActive
 }) => {
   const prevGroundedRef = React.useRef(true);
+  const lastShootTimeRef = React.useRef<number>(0);
 
   useFrame((_, delta) => {
     if (!isGameActive) return;
@@ -104,10 +114,43 @@ const FlightPhysicsLoop: React.FC<{
       return;
     }
 
-    // 5. Broadcast telemetry to peers over Socket.io
+    // 5. Dogfight Gunfire Handling (4 shots per second = 250ms cadence)
+    if (inputs.fire) {
+      const now = performance.now();
+      if (now - lastShootTimeRef.current >= 250) {
+        lastShootTimeRef.current = now;
+
+        const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(quatRef.current);
+        const noseOffset = new THREE.Vector3(0, -0.05, -2.5).applyQuaternion(quatRef.current);
+        const nosePos = pos.clone().add(noseOffset);
+
+        const bulletVel = forward.clone().multiplyScalar(currentTelemetry.airspeedMs + 320);
+        const bulletId = `${localId || 'local'}-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+
+        const newBullet: Bullet = {
+          id: bulletId,
+          shooterId: localId || 'local',
+          position: [nosePos.x, nosePos.y, nosePos.z],
+          velocity: [bulletVel.x, bulletVel.y, bulletVel.z],
+          createdAt: now,
+          lifetime: 2.5,
+          damage: 8
+        };
+
+        if (bulletsRef.current) {
+          bulletsRef.current.spawnBullet(newBullet);
+          bulletsRef.current.triggerMuzzleFlash([nosePos.x, nosePos.y, nosePos.z], quatRef.current);
+        }
+
+        playShootSfx();
+        broadcastShoot(newBullet);
+      }
+    }
+
+    // 6. Broadcast telemetry to peers over Socket.io
     broadcastTelemetry(currentTelemetry, quatRef.current, inputs);
 
-    // 6. Update procedural audio engine
+    // 7. Update procedural audio engine
     updateAudio(
       currentTelemetry.throttle,
       currentTelemetry.airspeedKnots,
@@ -123,12 +166,17 @@ const FlightPhysicsLoop: React.FC<{
 export function App() {
   const [isStartModalOpen, setIsStartModalOpen] = useState<boolean>(true);
   const [isHelpOpen, setIsHelpOpen] = useState<boolean>(false);
+  const [damageFlash, setDamageFlash] = useState<boolean>(false);
+  const bulletsRef = useRef<BulletsHandle>(null);
 
   const {
     initAudio,
     updateAudio,
     playTouchdownSfx,
     playCrashSfx,
+    playShootSfx,
+    playHitMarkerSfx,
+    playDamageSfx,
     isMuted,
     toggleMute,
     isAudioReady
@@ -140,7 +188,8 @@ export function App() {
     quatRef,
     updatePhysics,
     resetFlight,
-    triggerCrash
+    triggerCrash,
+    applyDamage
   } = useFlightPhysics();
 
   const {
@@ -149,6 +198,23 @@ export function App() {
     checkPlaneCollisions
   } = useCollision();
 
+  const handleLocalDamage = useCallback((data: DamageEvent) => {
+    playDamageSfx();
+    setDamageFlash(true);
+    setTimeout(() => setDamageFlash(false), 300);
+
+    const remaining = applyDamage(data.damage, `Shot down by ${data.shooterCallsign || 'enemy aircraft'}`);
+    if (remaining <= 0) {
+      playCrashSfx();
+    }
+  }, [applyDamage, playCrashSfx, playDamageSfx]);
+
+  const handleRemoteBullet = useCallback((bullet: Bullet) => {
+    if (bulletsRef.current) {
+      bulletsRef.current.spawnBullet(bullet);
+    }
+  }, []);
+
   const {
     isConnected,
     identity,
@@ -156,9 +222,14 @@ export function App() {
     remotePlayersRef,
     onlineCount,
     broadcastTelemetry,
+    broadcastShoot,
+    reportBulletHit,
     broadcastCrash,
     broadcastRespawn
-  } = useMultiplayer();
+  } = useMultiplayer({
+    onLocalDamage: handleLocalDamage,
+    onRemoteBullet: handleRemoteBullet
+  });
 
   const {
     isFullscreen,
@@ -179,7 +250,8 @@ export function App() {
     cameraMode,
     cycleCamera,
     getInputs,
-    setVirtualAxes
+    setVirtualAxes,
+    setIsFiringVirtual
   } = useFlightControls({
     onReset: handleReset,
     onMuteToggle: toggleMute,
@@ -211,6 +283,11 @@ export function App() {
     setThrottle(50);
     setIsStartModalOpen(false);
   }, [handleUserInteract, resetFlight, broadcastRespawn, setThrottle]);
+
+  const handleBulletHit = useCallback((targetId: string, bulletId: string, damage: number) => {
+    playHitMarkerSfx();
+    reportBulletHit(targetId, bulletId, damage);
+  }, [playHitMarkerSfx, reportBulletHit]);
 
   useEffect(() => {
     window.addEventListener('click', handleUserInteract, { once: true });
@@ -244,6 +321,9 @@ export function App() {
           isCrashed={telemetry.isCrashed}
           cameraMode={cameraMode}
           remotePlayers={remotePlayers}
+          bulletsRef={bulletsRef}
+          localId={identity?.id}
+          onBulletHit={handleBulletHit}
         />
 
         <FlightPhysicsLoop
@@ -255,12 +335,16 @@ export function App() {
           triggerCrash={triggerCrash}
           playTouchdownSfx={playTouchdownSfx}
           playCrashSfx={playCrashSfx}
+          playShootSfx={playShootSfx}
           updateAudio={updateAudio}
           broadcastTelemetry={broadcastTelemetry}
           broadcastCrash={broadcastCrash}
+          broadcastShoot={broadcastShoot}
           posRef={posRef}
           quatRef={quatRef}
           remotePlayersRef={remotePlayersRef}
+          bulletsRef={bulletsRef}
+          localId={identity?.id}
           isGameActive={!isStartModalOpen}
         />
       </Canvas>
@@ -273,6 +357,9 @@ export function App() {
         isBraking={isBraking}
         setIsBraking={setIsBraking}
         setVirtualAxes={setVirtualAxes}
+        setIsFiringVirtual={setIsFiringVirtual}
+        isFiring={inputs.fire}
+        damageFlash={damageFlash}
         cameraMode={cameraMode}
         cycleCamera={cycleCamera}
         isMuted={isMuted}

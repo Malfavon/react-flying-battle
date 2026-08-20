@@ -22,6 +22,8 @@ export interface FlightTelemetry {
   isCrashed: boolean;
   crashReason: string | null;
   isLanded: boolean;
+  health: number; // 0 to 100
+  maxHealth: number; // 100
 }
 
 export interface ControlInputs {
@@ -31,6 +33,7 @@ export interface ControlInputs {
   throttle: number; // 0 to 100
   flapStage: FlapStage;
   brakes: boolean;
+  fire: boolean;
 }
 
 export interface FlapConfiguration {
@@ -76,6 +79,8 @@ export interface RemotePlayer {
   isGrounded: boolean;
   isCrashed: boolean;
   crashReason: string | null;
+  health: number; // 0 to 100
+  maxHealth: number; // 100
 }
 
 export interface LocalPlayerIdentity {
@@ -84,5 +89,25 @@ export interface LocalPlayerIdentity {
   color: string;
   accentColor: string;
   wingColor: string;
+  health: number;
+  maxHealth: number;
+}
+
+export interface Bullet {
+  id: string;
+  shooterId: string;
+  position: [number, number, number];
+  velocity: [number, number, number];
+  createdAt: number;
+  lifetime: number; // in seconds (e.g. 2.5s)
+  damage: number;   // 8 HP
+}
+
+export interface DamageEvent {
+  targetId: string;
+  shooterId: string;
+  shooterCallsign?: string;
+  damage: number;
+  remainingHealth: number;
 }
 
