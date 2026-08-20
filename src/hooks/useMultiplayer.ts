@@ -14,10 +14,19 @@ export function useMultiplayer() {
   const lastSendTimeRef = useRef<number>(0);
 
   useEffect(() => {
-    // Connect directly to Socket.io backend on port 3001 (works seamlessly across localhost & LAN IP)
-    const serverUrl = typeof window !== 'undefined' && window.location.hostname
-      ? `${window.location.protocol}//${window.location.hostname}:3001`
-      : 'http://localhost:3001';
+    // Determine backend Socket.io server URL
+    // Priority:
+    // 1. VITE_SERVER_URL environment variable (configured in Vercel / .env)
+    // 2. Window hostname:3001 (for local dev & LAN testing)
+    // 3. http://localhost:3001 (default fallback)
+    const envUrl = import.meta.env.VITE_SERVER_URL;
+    const serverUrl = envUrl && envUrl.trim() !== ''
+      ? envUrl.trim()
+      : (typeof window !== 'undefined' && window.location.hostname
+          ? `${window.location.protocol}//${window.location.hostname}:3001`
+          : 'http://localhost:3001');
+
+    console.log('[Multiplayer] Connecting to server at:', serverUrl);
 
     const socket: Socket = io(serverUrl, {
       transports: ['websocket', 'polling'],

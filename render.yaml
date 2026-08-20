@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: flight-sim-server
+    runtime: node
+    plan: free
+    buildCommand: pnpm install
+    startCommand: node server/index.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: CLIENT_ORIGIN
+        value: "*"
+    healthCheckPath: /health
