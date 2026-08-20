@@ -245,6 +245,92 @@ export function useAudioEngine() {
     }
   }, [isMuted]);
 
+  // Gunfire SFX (Crisp machine gun / laser tracer)
+  const playShootSfx = useCallback(() => {
+    if (!audioCtxRef.current || isMuted || audioCtxRef.current.state !== 'running') return;
+    try {
+      const ctx = audioCtxRef.current;
+      const now = ctx.currentTime;
+
+      // Laser / Gunshot body oscillator
+      const osc = ctx.createOscillator();
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(620, now);
+      osc.frequency.exponentialRampToValueAtTime(110, now + 0.07);
+
+      const filter = ctx.createBiquadFilter();
+      filter.type = 'lowpass';
+      filter.frequency.setValueAtTime(2200, now);
+      filter.frequency.exponentialRampToValueAtTime(400, now + 0.07);
+
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(0.28, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+
+      osc.connect(filter);
+      filter.connect(gain);
+      if (masterGainRef.current) gain.connect(masterGainRef.current);
+
+      osc.start(now);
+      osc.stop(now + 0.09);
+    } catch {
+      // ignore
+    }
+  }, [isMuted]);
+
+  // Hit Marker Ding SFX (Confirming shot hit enemy aircraft)
+  const playHitMarkerSfx = useCallback(() => {
+    if (!audioCtxRef.current || isMuted || audioCtxRef.current.state !== 'running') return;
+    try {
+      const ctx = audioCtxRef.current;
+      const now = ctx.currentTime;
+
+      const osc = ctx.createOscillator();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(1760, now); // High A6 note
+      osc.frequency.exponentialRampToValueAtTime(2200, now + 0.1);
+
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(0.35, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+
+      osc.connect(gain);
+      if (masterGainRef.current) gain.connect(masterGainRef.current);
+
+      osc.start(now);
+      osc.stop(now + 0.13);
+    } catch {
+      // ignore
+    }
+  }, [isMuted]);
+
+  // Damage Impact SFX (Local aircraft taking damage)
+  const playDamageSfx = useCallback(() => {
+    if (!audioCtxRef.current || isMuted || audioCtxRef.current.state !== 'running') return;
+    try {
+      const ctx = audioCtxRef.current;
+      const now = ctx.currentTime;
+
+      // Heavy metallic thud
+      const osc = ctx.createOscillator();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(130, now);
+      osc.frequency.exponentialRampToValueAtTime(45, now + 0.22);
+
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(0.5, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
+
+      osc.connect(gain);
+      if (masterGainRef.current) gain.connect(masterGainRef.current);
+
+      osc.start(now);
+      osc.stop(now + 0.26);
+    } catch {
+      // ignore
+    }
+  }, [isMuted]);
+
   // Toggle Mute
   const toggleMute = useCallback(() => {
     setIsMuted((prev) => {
@@ -271,6 +357,9 @@ export function useAudioEngine() {
     updateAudio,
     playTouchdownSfx,
     playCrashSfx,
+    playShootSfx,
+    playHitMarkerSfx,
+    playDamageSfx,
     isMuted,
     toggleMute,
     isAudioReady

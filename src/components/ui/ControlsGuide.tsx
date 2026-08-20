@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Navigation, Disc3, Sliders, Camera, Smartphone, Keyboard, Move, Disc } from 'lucide-react';
+import { X, Navigation, Disc3, Sliders, Camera, Smartphone, Keyboard, Move, Disc, Crosshair } from 'lucide-react';
 
 interface ControlsGuideProps {
   isOpen: boolean;
@@ -105,6 +105,22 @@ export const ControlsGuide: React.FC<ControlsGuideProps> = ({ isOpen, onClose })
               </div>
             </div>
 
+            {/* Combat & Gunfire */}
+            <div className="flex items-start gap-3 p-2.5 rounded-lg bg-amber-950/30 border border-amber-500/40">
+              <Crosshair className="w-4 h-4 text-amber-400 mt-0.5" />
+              <div className="flex-1">
+                <div className="text-amber-300 font-semibold mb-1">Dogfight Guns & Combat (100 HP)</div>
+                <div className="text-slate-300 space-y-1">
+                  <div>
+                    <kbd className="px-1.5 py-0.5 bg-slate-800 border border-slate-600 rounded text-amber-300">F</kbd> / <kbd className="px-1.5 py-0.5 bg-slate-800 border border-slate-600 rounded text-amber-300">J</kbd> : Fire Machine Guns (Hold to shoot 4 shots/sec)
+                  </div>
+                  <div className="text-[11px] text-slate-400">
+                    Each shot deals <span className="text-amber-300 font-bold">8 DMG</span>. Shoot down enemy aircraft in aerial dogfights!
+                  </div>
+                </div>
+              </div>
+            </div>
+
             {/* Views & Utility */}
             <div className="flex items-start gap-3 p-2.5 rounded-lg bg-slate-800/40 border border-slate-700/40">
               <Camera className="w-4 h-4 text-cyan-400 mt-0.5" />
@@ -128,13 +144,13 @@ export const ControlsGuide: React.FC<ControlsGuideProps> = ({ isOpen, onClose })
             <div className="flex items-start gap-3 p-2.5 rounded-lg bg-slate-800/40 border border-slate-700/40">
               <Move className="w-4 h-4 text-sky-400 mt-0.5" />
               <div className="flex-1">
-                <div className="text-white font-semibold mb-1">Right Thumb: Virtual Flight Stick</div>
+                <div className="text-white font-semibold mb-1">Right Thumb: Virtual Flight Stick & Gun</div>
                 <div className="text-slate-300 space-y-1">
                   <div><span className="text-sky-300 font-bold">Drag Down</span> : Pitch UP (Pull back / Climb)</div>
                   <div><span className="text-sky-300 font-bold">Drag Up</span> : Pitch DOWN (Push / Dive)</div>
                   <div><span className="text-sky-300 font-bold">Drag Left / Right</span> : Roll & Coordinated Bank Turn</div>
+                  <div><span className="text-amber-300 font-bold">Hold FIRE (F)</span> : Fire 4 shots/sec (8 DMG per hit)</div>
                   <div><span className="text-sky-300 font-bold">YAW L / YAW R</span> : Tap Rudder Pedals for manual yaw</div>
-                  <div><span className="text-sky-300 font-bold">STD STICK / INV</span> : Toggle pitch stick inversion mode</div>
                 </div>
               </div>
             </div>

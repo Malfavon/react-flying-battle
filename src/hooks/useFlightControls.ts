@@ -30,11 +30,16 @@ export function useFlightControls({
     roll: 0,
     yaw: 0
   });
+  const virtualFireRef = useRef<boolean>(false);
 
   const setVirtualAxes = useCallback((axes: { pitch?: number; roll?: number; yaw?: number }) => {
     if (axes.pitch !== undefined) virtualAxesRef.current.pitch = axes.pitch;
     if (axes.roll !== undefined) virtualAxesRef.current.roll = axes.roll;
     if (axes.yaw !== undefined) virtualAxesRef.current.yaw = axes.yaw;
+  }, []);
+
+  const setIsFiringVirtual = useCallback((firing: boolean) => {
+    virtualFireRef.current = firing;
   }, []);
 
   const setThrottle = useCallback((val: number | ((prev: number) => number)) => {
@@ -87,6 +92,10 @@ export function useFlightControls({
           setIsBraking(true);
           e.preventDefault();
           break;
+        case 'KeyF':
+        case 'KeyJ':
+          keysPressed.current['Fire'] = true;
+          break;
         case 'KeyC':
           cycleCamera();
           break;
@@ -108,6 +117,9 @@ export function useFlightControls({
 
       if (e.code === 'Space') {
         setIsBraking(false);
+      }
+      if (e.code === 'KeyF' || e.code === 'KeyJ') {
+        keysPressed.current['Fire'] = false;
       }
     };
 
@@ -161,13 +173,16 @@ export function useFlightControls({
       yaw = roll * 0.35;
     }
 
+    const fire = !!keys['Fire'] || virtualFireRef.current;
+
     return {
       pitch,
       roll,
       yaw,
       throttle: throttleRef.current,
       flapStage: flapStageRef.current,
-      brakes: isBrakingRef.current || !!keys['Space']
+      brakes: isBrakingRef.current || !!keys['Space'],
+      fire
     };
   }, []);
 
@@ -182,6 +197,7 @@ export function useFlightControls({
     setCameraMode,
     cycleCamera,
     getInputs,
-    setVirtualAxes
+    setVirtualAxes,
+    setIsFiringVirtual
   };
 }

@@ -50,7 +50,9 @@ const INITIAL_STATE: FlightTelemetry = {
   isStalling: false,
   isCrashed: false,
   crashReason: null,
-  isLanded: false
+  isLanded: false,
+  health: 100,
+  maxHealth: 100
 };
 
 export function useFlightPhysics() {
@@ -62,6 +64,7 @@ export function useFlightPhysics() {
   const rotEulerRef = useRef<THREE.Euler>(new THREE.Euler(0, 0, 0, 'YXZ'));
   const quatRef = useRef<THREE.Quaternion>(new THREE.Quaternion());
   const hasEverBeenAirborneRef = useRef<boolean>(false);
+  const healthRef = useRef<number>(100);
 
   // Aircraft physical constants
   const mass = 700; // kg
@@ -85,6 +88,7 @@ export function useFlightPhysics() {
     const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(quatRef.current);
     velRef.current.copy(forward.multiplyScalar(initialSpeedMs));
     hasEverBeenAirborneRef.current = airborne;
+    healthRef.current = 100;
 
     setTelemetry({
       ...INITIAL_STATE,
@@ -97,7 +101,9 @@ export function useFlightPhysics() {
       altitudeFeet: Math.max(0, Math.round((spawnPos[1] - 1.2) * 3.28084)),
       throttle: initialThrottle,
       isGrounded: !airborne,
-      isLanded: false
+      isLanded: false,
+      health: 100,
+      maxHealth: 100
     });
   }, []);
 
@@ -292,7 +298,9 @@ export function useFlightPhysics() {
       isStalling,
       isCrashed: false,
       crashReason: null,
-      isLanded
+      isLanded,
+      health: healthRef.current,
+      maxHealth: 100
     };
 
     setTelemetry(newTelemetry);
@@ -308,14 +316,29 @@ export function useFlightPhysics() {
     }));
   }, []);
 
+  const applyDamage = useCallback((amount: number, reason: string = 'Shot down in aerial combat!') => {
+    healthRef.current = Math.max(0, healthRef.current - amount);
+    const remaining = healthRef.current;
+    setTelemetry((prev) => ({
+      ...prev,
+      health: remaining,
+      isCrashed: remaining <= 0 ? true : prev.isCrashed,
+      crashReason: remaining <= 0 ? reason : prev.crashReason,
+      velocity: remaining <= 0 ? [0, 0, 0] : prev.velocity
+    }));
+    return remaining;
+  }, []);
+
   return {
     telemetry,
     posRef,
     velRef,
     rotEulerRef,
     quatRef,
+    healthRef,
     updatePhysics,
     resetFlight,
-    triggerCrash
+    triggerCrash,
+    applyDamage
   };
 }

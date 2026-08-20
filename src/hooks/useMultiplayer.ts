@@ -1,9 +1,14 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { io, Socket } from 'socket.io-client';
 import * as THREE from 'three';
-import { RemotePlayer, LocalPlayerIdentity, FlightTelemetry, ControlInputs } from '../types/flight';
+import { RemotePlayer, LocalPlayerIdentity, FlightTelemetry, ControlInputs, Bullet, DamageEvent } from '../types/flight';
 
-export function useMultiplayer() {
+interface UseMultiplayerProps {
+  onLocalDamage?: (event: DamageEvent) => void;
+  onRemoteBullet?: (bullet: Bullet) => void;
+}
+
+export function useMultiplayer({ onLocalDamage, onRemoteBullet }: UseMultiplayerProps = {}) {
   const socketRef = useRef<Socket | null>(null);
   const [isConnected, setIsConnected] = useState<boolean>(false);
   const [identity, setIdentity] = useState<LocalPlayerIdentity | null>(null);
@@ -12,6 +17,13 @@ export function useMultiplayer() {
   // Ref mirror for zero-lag access inside 60FPS physics loop
   const remotePlayersRef = useRef<RemotePlayer[]>([]);
   const lastSendTimeRef = useRef<number>(0);
+  const onLocalDamageRef = useRef(onLocalDamage);
+  const onRemoteBulletRef = useRef(onRemoteBullet);
+
+  useEffect(() => {
+    onLocalDamageRef.current = onLocalDamage;
+    onRemoteBulletRef.current = onRemoteBullet;
+  }, [onLocalDamage, onRemoteBullet]);
 
   useEffect(() => {
     // Connect directly to Socket.io backend on port 3001 (works seamlessly across localhost & LAN IP)
@@ -59,7 +71,9 @@ export function useMultiplayer() {
               ...data,
               position: data.position || p.position,
               quaternion: data.quaternion || p.quaternion,
-              forwardSpeed: data.forwardSpeed !== undefined ? data.forwardSpeed : p.forwardSpeed
+              forwardSpeed: data.forwardSpeed !== undefined ? data.forwardSpeed : p.forwardSpeed,
+              health: data.health !== undefined ? data.health : p.health,
+              maxHealth: data.maxHealth !== undefined ? data.maxHealth : p.maxHealth
             };
           }
           return p;
@@ -67,6 +81,31 @@ export function useMultiplayer() {
         remotePlayersRef.current = updated;
         return updated;
       });
+    });
+
+    // Handle remote gunfire
+    socket.on('bulletFired', (bullet: Bullet) => {
+      if (onRemoteBulletRef.current) {
+        onRemoteBulletRef.current(bullet);
+      }
+    });
+
+    // Handle combat damage
+    socket.on('playerDamaged', (data: DamageEvent) => {
+      if (socket.id && data.targetId === socket.id) {
+        if (onLocalDamageRef.current) {
+          onLocalDamageRef.current(data);
+        }
+      } else {
+        // Update remote player health in state
+        setRemotePlayers((prev) => {
+          const updated = prev.map((p) =>
+            p.id === data.targetId ? { ...p, health: data.remainingHealth } : p
+          );
+          remotePlayersRef.current = updated;
+          return updated;
+        });
+      }
     });
 
     socket.on('playerCrashed', (data: { id: string; callsign: string; reason: string }) => {
@@ -77,9 +116,13 @@ export function useMultiplayer() {
       });
     });
 
-    socket.on('playerRespawned', (data: { id: string; callsign: string; position: [number, number, number] }) => {
+    socket.on('playerRespawned', (data: { id: string; callsign: string; position: [number, number, number]; health?: number }) => {
       setRemotePlayers((prev) => {
-        const updated = prev.map((p) => (p.id === data.id ? { ...p, isCrashed: false, crashReason: null, position: data.position } : p));
+        const updated = prev.map((p) =>
+          p.id === data.id
+            ? { ...p, isCrashed: false, crashReason: null, position: data.position, health: data.health ?? 100 }
+            : p
+        );
         remotePlayersRef.current = updated;
         return updated;
       });
@@ -123,8 +166,24 @@ export function useMultiplayer() {
       forwardSpeed: telemetry.airspeedMs,
       isGrounded: telemetry.isGrounded,
       isCrashed: telemetry.isCrashed,
-      crashReason: telemetry.crashReason
+      crashReason: telemetry.crashReason,
+      health: telemetry.health,
+      maxHealth: telemetry.maxHealth
     });
+  }, []);
+
+  // Broadcast gunfire
+  const broadcastShoot = useCallback((bullet: Bullet) => {
+    const socket = socketRef.current;
+    if (!socket || !socket.connected) return;
+    socket.emit('playerShoot', bullet);
+  }, []);
+
+  // Report bullet hit on a remote player
+  const reportBulletHit = useCallback((targetId: string, bulletId: string, damage: number = 8) => {
+    const socket = socketRef.current;
+    if (!socket || !socket.connected) return;
+    socket.emit('bulletHit', { targetId, bulletId, damage });
   }, []);
 
   // Immediate crash notification
@@ -148,6 +207,8 @@ export function useMultiplayer() {
     remotePlayersRef,
     onlineCount: (identity ? 1 : 0) + remotePlayers.length,
     broadcastTelemetry,
+    broadcastShoot,
+    reportBulletHit,
     broadcastCrash,
     broadcastRespawn
   };

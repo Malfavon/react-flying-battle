@@ -9,6 +9,7 @@ import { Clouds } from './Clouds';
 import { CrashParticles } from './CrashParticles';
 import { CameraController } from './CameraController';
 import { RemoteAirplane } from './RemoteAirplane';
+import { Bullets, BulletsHandle } from './Bullets';
 import { CameraMode, FlapStage, RemotePlayer } from '../../types/flight';
 
 interface WorldSceneProps {
@@ -24,6 +25,9 @@ interface WorldSceneProps {
   isCrashed: boolean;
   cameraMode: CameraMode;
   remotePlayers?: RemotePlayer[];
+  bulletsRef?: React.RefObject<BulletsHandle>;
+  localId?: string;
+  onBulletHit?: (targetId: string, bulletId: string, damage: number) => void;
 }
 
 export const WorldScene: React.FC<WorldSceneProps> = ({
@@ -38,7 +42,10 @@ export const WorldScene: React.FC<WorldSceneProps> = ({
   forwardSpeed,
   isCrashed,
   cameraMode,
-  remotePlayers = []
+  remotePlayers = [],
+  bulletsRef,
+  localId,
+  onBulletHit
 }) => {
   const planeGroupRef = useRef<THREE.Group>(null);
   const planePosVec = new THREE.Vector3(...planePos);
@@ -121,6 +128,14 @@ export const WorldScene: React.FC<WorldSceneProps> = ({
         planeQuat={planeQuat}
         cameraMode={cameraMode}
         airspeedMs={forwardSpeed}
+      />
+
+      {/* 3D Bullets & Laser Tracers */}
+      <Bullets
+        ref={bulletsRef}
+        remotePlayers={remotePlayers}
+        localId={localId}
+        onBulletHit={onBulletHit}
       />
     </>
   );

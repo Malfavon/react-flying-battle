@@ -62,6 +62,8 @@ io.on('connection', (socket) => {
     isGrounded: true,
     isCrashed: false,
     crashReason: null,
+    health: 100,
+    maxHealth: 100,
     lastUpdated: Date.now()
   };
 
@@ -94,6 +96,7 @@ io.on('connection', (socket) => {
     player.isGrounded = data.isGrounded;
     player.isCrashed = data.isCrashed;
     player.crashReason = data.crashReason || null;
+    if (data.health !== undefined) player.health = data.health;
     player.lastUpdated = Date.now();
 
     // Broadcast to other pilots
@@ -109,8 +112,48 @@ io.on('connection', (socket) => {
       forwardSpeed: player.forwardSpeed,
       isGrounded: player.isGrounded,
       isCrashed: player.isCrashed,
-      crashReason: player.crashReason
+      crashReason: player.crashReason,
+      health: player.health,
+      maxHealth: player.maxHealth
     });
+  });
+
+  // Handle player gunfire
+  socket.on('playerShoot', (bulletData) => {
+    socket.broadcast.emit('bulletFired', {
+      ...bulletData,
+      shooterId: socket.id
+    });
+  });
+
+  // Handle bullet hit & combat damage
+  socket.on('bulletHit', (hitData) => {
+    const { targetId, bulletId, damage = 8 } = hitData;
+    const target = players.get(targetId);
+    const shooter = players.get(socket.id);
+    if (!target || target.isCrashed) return;
+
+    target.health = Math.max(0, (target.health !== undefined ? target.health : 100) - damage);
+    console.log(`[Combat] ${shooter ? shooter.callsign : socket.id} hit ${target.callsign} (-${damage} HP, remaining: ${target.health} HP)`);
+
+    io.emit('playerDamaged', {
+      targetId,
+      shooterId: socket.id,
+      shooterCallsign: shooter ? shooter.callsign : 'Unknown',
+      bulletId,
+      damage,
+      remainingHealth: target.health
+    });
+
+    if (target.health <= 0) {
+      target.isCrashed = true;
+      target.crashReason = `Shot down in dogfight by ${shooter ? shooter.callsign : 'enemy aircraft'}`;
+      io.emit('playerCrashed', {
+        id: targetId,
+        callsign: target.callsign,
+        reason: target.crashReason
+      });
+    }
   });
 
   // Handle player crash broadcast
@@ -133,11 +176,13 @@ io.on('connection', (socket) => {
     if (player) {
       player.isCrashed = false;
       player.crashReason = null;
+      player.health = 100;
       player.position = data.position || [0, 7.2, 0];
       socket.broadcast.emit('playerRespawned', {
         id: socket.id,
         callsign: player.callsign,
-        position: player.position
+        position: player.position,
+        health: 100
       });
     }
   });
