@@ -37,8 +37,8 @@ export const OrientationPrompt: React.FC<OrientationPromptProps> = ({ onEnterFul
   if (!isPortrait || dismissed) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/90 backdrop-blur-md p-6 pointer-events-auto select-none animate-in fade-in duration-200">
-      <div className="bg-slate-900/90 border border-sky-500/40 rounded-2xl max-w-sm w-full p-6 text-center shadow-[0_0_40px_rgba(56,189,248,0.3)] relative">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/90 backdrop-blur-md p-4 pointer-events-auto select-none animate-in fade-in duration-200 overflow-y-auto">
+      <div className="bg-slate-900/90 border border-sky-500/40 rounded-2xl max-w-sm w-full p-5 sm:p-6 text-center shadow-[0_0_40px_rgba(56,189,248,0.3)] relative my-auto max-h-[92dvh] overflow-y-auto custom-scrollbar">
         {/* Close / Dismiss button */}
         <button
           onClick={() => setDismissed(true)}
