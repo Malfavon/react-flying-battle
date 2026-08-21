@@ -148,7 +148,7 @@ export const Airplane: React.FC<AirplaneProps> = ({
         <boxGeometry args={[7.6, 0.08, 1.2]} />
         <meshStandardMaterial color="#f1f5f9" roughness={0.3} />
       </mesh>
-      {/* Red/Blue Wingtips */}
+      {/* Red/Green Wingtips */}
       <mesh position={[-3.85, 0.15, -0.3]}>
         <boxGeometry args={[0.15, 0.2, 1.1]} />
         <meshStandardMaterial color="#ef4444" emissive="#ef4444" emissiveIntensity={0.6} />
@@ -156,6 +156,16 @@ export const Airplane: React.FC<AirplaneProps> = ({
       <mesh position={[3.85, 0.15, -0.3]}>
         <boxGeometry args={[0.15, 0.2, 1.1]} />
         <meshStandardMaterial color="#22c55e" emissive="#22c55e" emissiveIntensity={0.6} />
+      </mesh>
+
+      {/* Twin Wing Gun Barrels */}
+      <mesh position={[-1.8, 0.05, -0.75]} rotation={[Math.PI / 2, 0, 0]} castShadow>
+        <cylinderGeometry args={[0.04, 0.04, 0.8, 8]} />
+        <meshStandardMaterial color="#334155" metalness={0.8} roughness={0.2} />
+      </mesh>
+      <mesh position={[1.8, 0.05, -0.75]} rotation={[Math.PI / 2, 0, 0]} castShadow>
+        <cylinderGeometry args={[0.04, 0.04, 0.8, 8]} />
+        <meshStandardMaterial color="#334155" metalness={0.8} roughness={0.2} />
       </mesh>
 
       {/* --- FLAPS (Inboard Trailing Edge) --- */}

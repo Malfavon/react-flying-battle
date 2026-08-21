@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Canvas, useFrame } from '@react-three/fiber';
+import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { useFlightControls } from './hooks/useFlightControls';
 import { useFlightPhysics } from './hooks/useFlightPhysics';
 import { useCollision } from './hooks/useCollision';
 import { useAudioEngine } from './hooks/useAudioEngine';
 import { useMultiplayer } from './hooks/useMultiplayer';
+import { computeCombatTargeting } from './hooks/useCombatTargeting';
 import { WorldScene } from './components/3d/WorldScene';
 import { BulletsHandle } from './components/3d/Bullets';
 import { HUD } from './components/ui/HUD';
@@ -14,8 +15,47 @@ import { LandingModal } from './components/ui/LandingModal';
 import { CrashModal } from './components/ui/CrashModal';
 import { OrientationPrompt } from './components/ui/OrientationPrompt';
 import { useFullscreen } from './hooks/useFullscreen';
-import { FlightTelemetry, ControlInputs, RemotePlayer, Bullet, DamageEvent } from './types/flight';
+import { FlightTelemetry, ControlInputs, RemotePlayer, Bullet, DamageEvent, TacticalRadarData } from './types/flight';
 import * as THREE from 'three';
+
+// Sub-component inside Canvas to compute 2D tactical radar & off-screen threat positions
+const CombatTargetingManager: React.FC<{
+  playerPosRef: React.MutableRefObject<THREE.Vector3>;
+  playerQuatRef: React.MutableRefObject<THREE.Quaternion>;
+  playerSpeedMs: number;
+  remotePlayers: RemotePlayer[];
+  onTargetingUpdate: (data: TacticalRadarData) => void;
+}> = ({
+  playerPosRef,
+  playerQuatRef,
+  playerSpeedMs,
+  remotePlayers,
+  onTargetingUpdate
+}) => {
+  const { camera, size } = useThree();
+  const lastUpdateRef = React.useRef<number>(0);
+
+  useFrame(() => {
+    const now = performance.now();
+    // Throttle 2D radar / edge updates to 20Hz (~50ms) for high performance
+    if (now - lastUpdateRef.current < 50) return;
+    lastUpdateRef.current = now;
+
+    if (!playerPosRef.current || !playerQuatRef.current) return;
+    const targetingData = computeCombatTargeting(
+      camera,
+      playerPosRef.current,
+      playerQuatRef.current,
+      playerSpeedMs,
+      remotePlayers,
+      size.width,
+      size.height
+    );
+    onTargetingUpdate(targetingData);
+  });
+
+  return null;
+};
 
 // Sub-component inside Canvas to run physics & combat loop at RAF rate
 const FlightPhysicsLoop: React.FC<{
@@ -61,6 +101,7 @@ const FlightPhysicsLoop: React.FC<{
 }) => {
   const prevGroundedRef = React.useRef(true);
   const lastShootTimeRef = React.useRef<number>(0);
+  const wingGunSideRef = React.useRef<number>(0);
 
   useFrame((_, delta) => {
     if (!isGameActive) return;
@@ -114,23 +155,28 @@ const FlightPhysicsLoop: React.FC<{
       return;
     }
 
-    // 5. Dogfight Gunfire Handling (4 shots per second = 250ms cadence)
+    // 5. Dogfight Gunfire Handling: Rapid-Fire Twin Wing Cannons (90ms cadence = ~11 shots/sec)
     if (inputs.fire) {
       const now = performance.now();
-      if (now - lastShootTimeRef.current >= 250) {
+      if (now - lastShootTimeRef.current >= 90) {
         lastShootTimeRef.current = now;
 
-        const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(quatRef.current);
-        const noseOffset = new THREE.Vector3(0, -0.05, -2.5).applyQuaternion(quatRef.current);
-        const nosePos = pos.clone().add(noseOffset);
+        // Alternate between Left (-1.8m) and Right (+1.8m) wing gun nozzles
+        wingGunSideRef.current = wingGunSideRef.current === 0 ? 1 : 0;
+        const gunXOffset = wingGunSideRef.current === 0 ? -1.8 : 1.8;
 
-        const bulletVel = forward.clone().multiplyScalar(currentTelemetry.airspeedMs + 320);
+        const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(quatRef.current);
+        const wingGunOffset = new THREE.Vector3(gunXOffset, 0.05, -0.8).applyQuaternion(quatRef.current);
+        const muzzlePos = pos.clone().add(wingGunOffset);
+
+        // High velocity ballistic speed (airspeed + 450 m/s)
+        const bulletVel = forward.clone().multiplyScalar(currentTelemetry.airspeedMs + 450);
         const bulletId = `${localId || 'local'}-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
 
         const newBullet: Bullet = {
           id: bulletId,
           shooterId: localId || 'local',
-          position: [nosePos.x, nosePos.y, nosePos.z],
+          position: [muzzlePos.x, muzzlePos.y, muzzlePos.z],
           velocity: [bulletVel.x, bulletVel.y, bulletVel.z],
           createdAt: now,
           lifetime: 2.5,
@@ -139,7 +185,7 @@ const FlightPhysicsLoop: React.FC<{
 
         if (bulletsRef.current) {
           bulletsRef.current.spawnBullet(newBullet);
-          bulletsRef.current.triggerMuzzleFlash([nosePos.x, nosePos.y, nosePos.z], quatRef.current);
+          bulletsRef.current.triggerMuzzleFlash([muzzlePos.x, muzzlePos.y, muzzlePos.z], quatRef.current);
         }
 
         playShootSfx();
@@ -167,6 +213,8 @@ export function App() {
   const [isStartModalOpen, setIsStartModalOpen] = useState<boolean>(true);
   const [isHelpOpen, setIsHelpOpen] = useState<boolean>(false);
   const [damageFlash, setDamageFlash] = useState<boolean>(false);
+  const [targetingData, setTargetingData] = useState<TacticalRadarData>({ targets: [], primaryTarget: null });
+  const [hitMarkerTime, setHitMarkerTime] = useState<number>(0);
   const bulletsRef = useRef<BulletsHandle>(null);
 
   const {
@@ -286,6 +334,7 @@ export function App() {
 
   const handleBulletHit = useCallback((targetId: string, bulletId: string, damage: number) => {
     playHitMarkerSfx();
+    setHitMarkerTime(performance.now());
     reportBulletHit(targetId, bulletId, damage);
   }, [playHitMarkerSfx, reportBulletHit]);
 
@@ -326,6 +375,14 @@ export function App() {
           onBulletHit={handleBulletHit}
         />
 
+        <CombatTargetingManager
+          playerPosRef={posRef}
+          playerQuatRef={quatRef}
+          playerSpeedMs={telemetry.airspeedMs}
+          remotePlayers={remotePlayers}
+          onTargetingUpdate={setTargetingData}
+        />
+
         <FlightPhysicsLoop
           updatePhysics={updatePhysics}
           getInputs={getInputs}
@@ -349,7 +406,7 @@ export function App() {
         />
       </Canvas>
 
-      {/* Flight HUD Overlay */}
+      {/* Flight HUD Overlay with Combat Systems */}
       <HUD
         telemetry={telemetry}
         setThrottle={setThrottle}
@@ -368,6 +425,8 @@ export function App() {
         onOpenHelp={() => setIsHelpOpen(true)}
         isFullscreen={isFullscreen}
         onToggleFullscreen={toggleFullscreen}
+        targetingData={targetingData}
+        hitMarkerTime={hitMarkerTime}
         multiplayer={{
           isConnected,
           onlineCount,

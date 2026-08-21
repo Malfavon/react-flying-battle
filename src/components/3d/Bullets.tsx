@@ -12,6 +12,7 @@ interface ActiveBullet {
   id: string;
   shooterId: string;
   pos: THREE.Vector3;
+  prevPos: THREE.Vector3;
   vel: THREE.Vector3;
   quat: THREE.Quaternion;
   createdAt: number;
@@ -39,9 +40,9 @@ interface BulletsProps {
   onBulletHit?: (targetId: string, bulletId: string, damage: number) => void;
 }
 
-const MAX_BULLETS = 200;
-const MAX_SPARKS = 150;
-const BULLET_RADIUS = 3.6; // Collision radius against planes (meters)
+const MAX_BULLETS = 400;
+const MAX_SPARKS = 250;
+const BULLET_RADIUS = 3.2; // Realistic aircraft hitbox radius (meters) with continuous swept-segment collision
 
 export const Bullets = forwardRef<BulletsHandle, BulletsProps>(({
   remotePlayers,
@@ -50,13 +51,12 @@ export const Bullets = forwardRef<BulletsHandle, BulletsProps>(({
 }, ref) => {
   const bulletsRef = useRef<ActiveBullet[]>([]);
   const sparksRef = useRef<Spark[]>([]);
-  const muzzleFlashRef = useRef<MuzzleFlashState | null>(null);
+  const muzzleFlashesRef = useRef<MuzzleFlashState[]>([]);
 
   // Three.js references
   const coreMeshRef = useRef<THREE.InstancedMesh>(null);
   const glowMeshRef = useRef<THREE.InstancedMesh>(null);
   const sparksMeshRef = useRef<THREE.InstancedMesh>(null);
-  const muzzleGroupRef = useRef<THREE.Group>(null);
 
   // Temporary transform objects for instanced matrix math
   const dummy = useMemo(() => new THREE.Object3D(), []);
@@ -64,18 +64,18 @@ export const Bullets = forwardRef<BulletsHandle, BulletsProps>(({
 
   // Pre-rotated geometries so cylinder aligns along -Z (forward)
   const coreGeometry = useMemo(() => {
-    const geo = new THREE.CylinderGeometry(0.09, 0.09, 2.8, 8);
+    const geo = new THREE.CylinderGeometry(0.12, 0.12, 3.8, 8);
     geo.rotateX(Math.PI / 2);
     return geo;
   }, []);
 
   const glowGeometry = useMemo(() => {
-    const geo = new THREE.CylinderGeometry(0.22, 0.22, 3.2, 8);
+    const geo = new THREE.CylinderGeometry(0.28, 0.28, 4.4, 8);
     geo.rotateX(Math.PI / 2);
     return geo;
   }, []);
 
-  const sparkGeometry = useMemo(() => new THREE.SphereGeometry(0.25, 6, 6), []);
+  const sparkGeometry = useMemo(() => new THREE.SphereGeometry(0.28, 6, 6), []);
 
   useImperativeHandle(ref, () => ({
     spawnBullet: (bullet: Bullet) => {
@@ -90,7 +90,8 @@ export const Bullets = forwardRef<BulletsHandle, BulletsProps>(({
         bulletsRef.current.push({
           id: bullet.id,
           shooterId: bullet.shooterId,
-          pos: posVec,
+          pos: posVec.clone(),
+          prevPos: posVec.clone(),
           vel: velVec,
           quat,
           createdAt: performance.now(),
@@ -100,28 +101,32 @@ export const Bullets = forwardRef<BulletsHandle, BulletsProps>(({
       }
     },
     triggerMuzzleFlash: (pos: [number, number, number], quat: THREE.Quaternion) => {
-      muzzleFlashRef.current = {
+      const flash: MuzzleFlashState = {
         pos: new THREE.Vector3(...pos),
         quat: quat.clone(),
-        expiresAt: performance.now() + 75 // 75ms flash
+        expiresAt: performance.now() + 65 // 65ms rapid muzzle flash
       };
+      muzzleFlashesRef.current = [
+        ...muzzleFlashesRef.current.filter((f) => performance.now() <= f.expiresAt),
+        flash
+      ].slice(-6); // Keep last 6 flashes
     }
   }));
 
   const spawnSparks = (pos: THREE.Vector3) => {
-    for (let i = 0; i < 8; i++) {
+    for (let i = 0; i < 10; i++) {
       if (sparksRef.current.length >= MAX_SPARKS) break;
-      const speed = 5 + Math.random() * 14;
+      const speed = 6 + Math.random() * 16;
       const theta = Math.random() * Math.PI * 2;
       const phi = (Math.random() - 0.5) * Math.PI;
       sparksRef.current.push({
         pos: pos.clone(),
         vel: new THREE.Vector3(
           Math.cos(theta) * Math.cos(phi) * speed,
-          Math.sin(phi) * speed + 2,
+          Math.sin(phi) * speed + 2.5,
           Math.sin(theta) * Math.cos(phi) * speed
         ),
-        scale: 0.25 + Math.random() * 0.35,
+        scale: 0.28 + Math.random() * 0.35,
         alpha: 1.0,
         createdAt: performance.now()
       });
@@ -153,7 +158,15 @@ export const Bullets = forwardRef<BulletsHandle, BulletsProps>(({
     const activeBullets = bulletsRef.current;
     const remainingBullets: ActiveBullet[] = [];
 
-    // 1. Update active bullets & check hits
+    // Pre-cache remote target vectors for fast collision & magnetism
+    const targetEntities = remotePlayers
+      .filter((p) => !p.isCrashed)
+      .map((p) => ({
+        id: p.id,
+        pos: new THREE.Vector3(p.position[0], p.position[1], p.position[2])
+      }));
+
+    // 1. Update active bullets & check continuous swept-segment hits
     for (let i = 0; i < activeBullets.length; i++) {
       const b = activeBullets[i];
       const age = now - b.createdAt;
@@ -162,7 +175,9 @@ export const Bullets = forwardRef<BulletsHandle, BulletsProps>(({
         continue; // Expired
       }
 
-      // Step position forward along velocity
+      b.prevPos.copy(b.pos);
+
+      // Step position forward along velocity (Pure straight ballistics)
       b.pos.addScaledVector(b.vel, dt);
 
       // Check ground/water hit
@@ -173,22 +188,32 @@ export const Bullets = forwardRef<BulletsHandle, BulletsProps>(({
 
       let hit = false;
 
-      // Hit detection: local player's bullets check against remote players
+      // Continuous Swept-Segment Hit Detection (Zero Tunneling)
       const isLocalBullet = !b.shooterId || b.shooterId === 'local' || (localId && b.shooterId === localId);
-      if (isLocalBullet) {
-        for (const player of remotePlayers) {
-          if (player.isCrashed) continue;
+      if (isLocalBullet && targetEntities.length > 0) {
+        const seg = new THREE.Vector3().subVectors(b.pos, b.prevPos);
+        const segLenSq = seg.lengthSq();
 
-          const dx = b.pos.x - player.position[0];
-          const dy = b.pos.y - player.position[1];
-          const dz = b.pos.z - player.position[2];
-          const distSq = dx * dx + dy * dy + dz * dz;
+        for (let t = 0; t < targetEntities.length; t++) {
+          const target = targetEntities[t];
+
+          let distSq = 0;
+          let closestPoint = b.pos;
+
+          if (segLenSq > 0.0001) {
+            const toTarget = new THREE.Vector3().subVectors(target.pos, b.prevPos);
+            const factor = THREE.MathUtils.clamp(toTarget.dot(seg) / segLenSq, 0, 1);
+            closestPoint = b.prevPos.clone().addScaledVector(seg, factor);
+            distSq = closestPoint.distanceToSquared(target.pos);
+          } else {
+            distSq = b.pos.distanceToSquared(target.pos);
+          }
 
           if (distSq <= BULLET_RADIUS * BULLET_RADIUS) {
             hit = true;
-            spawnSparks(b.pos);
+            spawnSparks(closestPoint);
             if (onBulletHit) {
-              onBulletHit(player.id, b.id, b.damage);
+              onBulletHit(target.id, b.id, b.damage);
             }
             break;
           }
@@ -252,20 +277,6 @@ export const Bullets = forwardRef<BulletsHandle, BulletsProps>(({
       sparksMeshRef.current.count = count;
       sparksMeshRef.current.instanceMatrix.needsUpdate = true;
     }
-
-    // 3. Update Muzzle Flash visibility & transform
-    if (muzzleGroupRef.current) {
-      if (muzzleFlashRef.current && now <= muzzleFlashRef.current.expiresAt) {
-        muzzleGroupRef.current.visible = true;
-        muzzleGroupRef.current.position.copy(muzzleFlashRef.current.pos);
-        muzzleGroupRef.current.quaternion.copy(muzzleFlashRef.current.quat);
-      } else {
-        muzzleGroupRef.current.visible = false;
-        if (muzzleFlashRef.current && now > muzzleFlashRef.current.expiresAt) {
-          muzzleFlashRef.current = null;
-        }
-      }
-    }
   });
 
   return (
@@ -285,7 +296,7 @@ export const Bullets = forwardRef<BulletsHandle, BulletsProps>(({
         args={[glowGeometry, undefined, MAX_BULLETS]}
         frustumCulled={false}
       >
-        <meshBasicMaterial color="#f59e0b" transparent opacity={0.85} depthWrite={false} toneMapped={false} />
+        <meshBasicMaterial color="#f59e0b" transparent opacity={0.88} depthWrite={false} toneMapped={false} />
       </instancedMesh>
 
       {/* Impact Sparks (Instanced) */}
@@ -296,19 +307,6 @@ export const Bullets = forwardRef<BulletsHandle, BulletsProps>(({
       >
         <meshBasicMaterial color="#fde047" transparent opacity={0.9} depthWrite={false} toneMapped={false} />
       </instancedMesh>
-
-      {/* Muzzle Flash Effect at Nose */}
-      <group ref={muzzleGroupRef} visible={false}>
-        <mesh>
-          <sphereGeometry args={[0.35, 8, 8]} />
-          <meshBasicMaterial color="#fef08a" toneMapped={false} />
-        </mesh>
-        <mesh>
-          <sphereGeometry args={[0.65, 8, 8]} />
-          <meshBasicMaterial color="#f97316" transparent opacity={0.65} depthWrite={false} toneMapped={false} />
-        </mesh>
-        <pointLight color="#fef08a" intensity={4.0} distance={12} />
-      </group>
     </group>
   );
 });

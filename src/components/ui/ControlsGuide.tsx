@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Navigation, Sliders, Smartphone, Keyboard, Move, Disc, Crosshair } from 'lucide-react';
+import { X, Navigation, Disc3, Sliders, Camera, Smartphone, Keyboard, Move, Disc, Crosshair } from 'lucide-react';
 
 interface ControlsGuideProps {
   isOpen: boolean;
@@ -99,6 +99,7 @@ export const ControlsGuide: React.FC<ControlsGuideProps> = ({ isOpen, onClose })
                 <div className="text-slate-300 space-y-0.5 text-[11px]">
                   <div><span className="text-cyan-300 font-bold">Fullscreen Icon</span> : Toggle immersive fullscreen</div>
                   <div><span className="text-cyan-300 font-bold">Gamepad Icon</span> : Toggle virtual flight stick</div>
+                  <div><span className="text-cyan-300 font-bold">Crosshair Icon</span> : Toggle tactical radar overlay</div>
                   <div><span className="text-cyan-300 font-bold">Camera / Sound / Reset</span> : Switch cockpit/chase, mute, or respawn</div>
                 </div>
               </div>
@@ -139,13 +140,48 @@ export const ControlsGuide: React.FC<ControlsGuideProps> = ({ isOpen, onClose })
               </div>
             </div>
 
+            {/* Flaps */}
+            <div className="flex items-start gap-2.5 p-2.5 rounded-lg bg-slate-800/40 border border-slate-700/40">
+              <Disc3 className="w-4 h-4 text-amber-400 mt-0.5" />
+              <div className="flex-1">
+                <div className="text-white font-semibold mb-1">3 Flap Configurations</div>
+                <div className="text-slate-300 space-y-0.5 text-[11px]">
+                  <div><kbd className="px-1.5 py-0.5 bg-slate-800 border border-slate-600 rounded text-amber-300">1</kbd> : Flaps 0° Clean (High speed cruise)</div>
+                  <div><kbd className="px-1.5 py-0.5 bg-slate-800 border border-slate-600 rounded text-amber-300">2</kbd> : Flaps 15° Takeoff / Approach (+35% lift)</div>
+                  <div><kbd className="px-1.5 py-0.5 bg-slate-800 border border-slate-600 rounded text-amber-300">3</kbd> : Flaps 30° Landing (+70% lift & high drag)</div>
+                </div>
+              </div>
+            </div>
+
             {/* Combat & Gunfire */}
             <div className="flex items-start gap-2.5 p-2.5 rounded-lg bg-amber-950/30 border border-amber-500/40">
               <Crosshair className="w-4 h-4 text-amber-400 mt-0.5" />
               <div className="flex-1">
-                <div className="text-amber-300 font-semibold mb-1">Dogfight Guns & Combat</div>
-                <div className="text-slate-300 text-[11px]">
-                  <kbd className="px-1 py-0.5 bg-slate-800 border border-slate-600 rounded text-amber-300">F</kbd> / <kbd className="px-1 py-0.5 bg-slate-800 border border-slate-600 rounded text-amber-300">J</kbd> : Rapid-fire Twin Cannons (8 DMG per shot)
+                <div className="text-amber-300 font-semibold mb-1">Dogfight Twin Guns & Lead Gunsight</div>
+                <div className="text-slate-300 space-y-0.5 text-[11px]">
+                  <div>
+                    <kbd className="px-1.5 py-0.5 bg-slate-800 border border-slate-600 rounded text-amber-300">F</kbd> / <kbd className="px-1.5 py-0.5 bg-slate-800 border border-slate-600 rounded text-amber-300">J</kbd> : Rapid-fire twin wing cannons (11 shots/sec)
+                  </div>
+                  <div>
+                    <span className="text-emerald-400 font-bold">🎯 Lead Gunsight</span>: Align crosshair with the dynamic lead pip in front of enemy aircraft.
+                  </div>
+                  <div>
+                    <span className="text-sky-400 font-bold">📡 Tactical Radar</span>: Track enemy aircraft 360° around you with relative altitude indicators.
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Views & Utility */}
+            <div className="flex items-start gap-2.5 p-2.5 rounded-lg bg-slate-800/40 border border-slate-700/40">
+              <Camera className="w-4 h-4 text-cyan-400 mt-0.5" />
+              <div className="flex-1">
+                <div className="text-white font-semibold mb-1">Camera & Quick Actions</div>
+                <div className="grid grid-cols-2 gap-y-1 text-slate-300 text-[11px]">
+                  <div><kbd className="px-1.5 py-0.5 bg-slate-800 border border-slate-600 rounded text-cyan-300">C</kbd> : Chase / Cockpit Cam</div>
+                  <div><kbd className="px-1.5 py-0.5 bg-slate-800 border border-slate-600 rounded text-cyan-300">R</kbd> : Quick Respawn (Resets to 0% Throttle)</div>
+                  <div><kbd className="px-1.5 py-0.5 bg-slate-800 border border-slate-600 rounded text-cyan-300">M</kbd> : Mute / Unmute Audio</div>
+                  <div><kbd className="px-1.5 py-0.5 bg-slate-800 border border-slate-600 rounded text-cyan-300">H</kbd> : Toggle This Guide</div>
                 </div>
               </div>
             </div>
