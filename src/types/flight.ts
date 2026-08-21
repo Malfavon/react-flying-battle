@@ -111,3 +111,41 @@ export interface DamageEvent {
   remainingHealth: number;
 }
 
+export interface TargetHUDData {
+  id: string;
+  callsign: string;
+  color?: string;
+  accentColor?: string;
+  distance: number;
+  health: number;
+  maxHealth: number;
+  isCrashed: boolean;
+  // Screen coordinate (pixels from top-left)
+  screenX: number;
+  screenY: number;
+  isVisibleOnScreen: boolean; // in front of camera and inside screen bounds
+  isBehindCamera: boolean;
+  
+  // Predictive lead pip
+  leadScreenX: number;
+  leadScreenY: number;
+  hasLeadSolution: boolean;
+  isLeadInRange: boolean; // Reticle is near lead pip
+  leadDistance: number;
+
+  // Off-screen indicator
+  edgeX: number; // Screen-edge clamped pixel coordinate
+  edgeY: number;
+  edgeAngleRad: number; // Angle from screen center to target
+
+  // Tactical Radar coordinates (-1 to 1 normalized, 0,0 is player)
+  radarX: number;
+  radarY: number;
+  altitudeDiffMeters: number; // Positive = above player, Negative = below
+}
+
+export interface TacticalRadarData {
+  targets: TargetHUDData[];
+  primaryTarget: TargetHUDData | null;
+}
+

@@ -109,13 +109,16 @@ export const ControlsGuide: React.FC<ControlsGuideProps> = ({ isOpen, onClose })
             <div className="flex items-start gap-3 p-2.5 rounded-lg bg-amber-950/30 border border-amber-500/40">
               <Crosshair className="w-4 h-4 text-amber-400 mt-0.5" />
               <div className="flex-1">
-                <div className="text-amber-300 font-semibold mb-1">Dogfight Guns & Combat (100 HP)</div>
+                <div className="text-amber-300 font-semibold mb-1">Dogfight Twin Guns & Lead Gunsight</div>
                 <div className="text-slate-300 space-y-1">
                   <div>
-                    <kbd className="px-1.5 py-0.5 bg-slate-800 border border-slate-600 rounded text-amber-300">F</kbd> / <kbd className="px-1.5 py-0.5 bg-slate-800 border border-slate-600 rounded text-amber-300">J</kbd> : Fire Machine Guns (Hold to shoot 4 shots/sec)
+                    <kbd className="px-1.5 py-0.5 bg-slate-800 border border-slate-600 rounded text-amber-300">F</kbd> / <kbd className="px-1.5 py-0.5 bg-slate-800 border border-slate-600 rounded text-amber-300">J</kbd> : Rapid-fire twin wing cannons (11 shots/sec)
                   </div>
-                  <div className="text-[11px] text-slate-400">
-                    Each shot deals <span className="text-amber-300 font-bold">8 DMG</span>. Shoot down enemy aircraft in aerial dogfights!
+                  <div className="text-[11px] text-slate-300">
+                    <span className="text-emerald-400 font-bold">🎯 Predictive Lead Gunsight</span>: Align your crosshair with the dynamic lead pip in front of enemy aircraft for direct hits.
+                  </div>
+                  <div className="text-[11px] text-slate-300">
+                    <span className="text-sky-400 font-bold">📡 Tactical Radar & Off-Screen Chevrons</span>: Track enemy aircraft 360° around you with relative altitude indicators.
                   </div>
                 </div>
               </div>
@@ -149,7 +152,7 @@ export const ControlsGuide: React.FC<ControlsGuideProps> = ({ isOpen, onClose })
                   <div><span className="text-sky-300 font-bold">Drag Down</span> : Pitch UP (Pull back / Climb)</div>
                   <div><span className="text-sky-300 font-bold">Drag Up</span> : Pitch DOWN (Push / Dive)</div>
                   <div><span className="text-sky-300 font-bold">Drag Left / Right</span> : Roll & Coordinated Bank Turn</div>
-                  <div><span className="text-amber-300 font-bold">Hold FIRE (F)</span> : Fire 4 shots/sec (8 DMG per hit)</div>
+                  <div><span className="text-amber-300 font-bold">Hold FIRE (F)</span> : Rapid-fire twin wing cannons (8 DMG per hit)</div>
                   <div><span className="text-sky-300 font-bold">YAW L / YAW R</span> : Tap Rudder Pedals for manual yaw</div>
                 </div>
               </div>
