@@ -1,6 +1,15 @@
 import { useState, useEffect, useCallback } from 'react';
 
 export function useFullscreen() {
+  const isSupported = typeof document !== 'undefined' && !!(
+    document.fullscreenEnabled ||
+    (document as any).webkitFullscreenEnabled ||
+    (document as any).mozFullScreenEnabled ||
+    (document as any).msFullscreenEnabled ||
+    document.documentElement?.requestFullscreen ||
+    (document.documentElement as any)?.webkitRequestFullscreen
+  );
+
   const getIsFullscreen = useCallback((): boolean => {
     if (typeof document === 'undefined') return false;
     const doc = document as any;
@@ -44,7 +53,7 @@ export function useFullscreen() {
         try {
           await (screen.orientation as any).lock('landscape');
         } catch {
-          // Ignore orientation lock failures (e.g. unsupported on some browsers/iOS)
+          // Ignore orientation lock failures
         }
       }
     } catch (err) {
@@ -76,14 +85,20 @@ export function useFullscreen() {
   }, []);
 
   const toggleFullscreen = useCallback(async (element?: HTMLElement) => {
+    if (!isSupported) {
+      // On iOS Safari where Fullscreen API is unavailable, scroll down to collapse toolbar
+      window.scrollTo(0, 1);
+      return;
+    }
     if (getIsFullscreen()) {
       await exitFullscreen();
     } else {
       await enterFullscreen(element);
     }
-  }, [getIsFullscreen, enterFullscreen, exitFullscreen]);
+  }, [isSupported, getIsFullscreen, enterFullscreen, exitFullscreen]);
 
   return {
+    isSupported,
     isFullscreen,
     enterFullscreen,
     exitFullscreen,

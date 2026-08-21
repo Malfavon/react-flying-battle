@@ -8,7 +8,7 @@ interface VirtualJoystickProps {
 }
 
 const DEFAULT_RADIUS = 48;
-const COMPACT_RADIUS = 38;
+const COMPACT_RADIUS = 34;
 const DEADZONE = 0.08; // 8% deadzone to avoid micro-jitter
 
 export const VirtualJoystick: React.FC<VirtualJoystickProps> = ({
@@ -160,7 +160,7 @@ export const VirtualJoystick: React.FC<VirtualJoystickProps> = ({
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}
           onPointerCancel={handlePointerUp}
-          className={`relative ${compact ? 'w-28 h-28' : 'w-32 h-32'} rounded-full border-2 transition-colors duration-150 flex items-center justify-center cursor-grab active:cursor-grabbing touch-none ${
+          className={`relative ${compact ? 'w-24 h-24 sm:w-28 sm:h-28' : 'w-32 h-32'} rounded-full border-2 transition-colors duration-150 flex items-center justify-center cursor-grab active:cursor-grabbing touch-none ${
             isActive
               ? 'bg-slate-950/60 border-sky-400 shadow-[0_0_20px_rgba(56,189,248,0.5)]'
               : 'bg-slate-950/40 border-sky-500/30 hover:border-sky-400/50 shadow-xl'
@@ -168,8 +168,8 @@ export const VirtualJoystick: React.FC<VirtualJoystickProps> = ({
           style={{ touchAction: 'none' }}
         >
           {/* Inner concentric guidance rings */}
-          <div className="absolute w-20 h-20 rounded-full border border-dashed border-sky-500/20 pointer-events-none" />
-          <div className="absolute w-10 h-10 rounded-full border border-sky-500/25 pointer-events-none" />
+          <div className={`absolute ${compact ? 'w-16 h-16' : 'w-20 h-20'} rounded-full border border-dashed border-sky-500/20 pointer-events-none`} />
+          <div className={`absolute ${compact ? 'w-8 h-8' : 'w-10 h-10'} rounded-full border border-sky-500/25 pointer-events-none`} />
 
           {/* Crosshair Guides */}
           <div className="absolute w-full h-[1px] bg-sky-500/20 pointer-events-none" />
@@ -191,7 +191,7 @@ export const VirtualJoystick: React.FC<VirtualJoystickProps> = ({
 
           {/* Interactive Thumb Knob */}
           <div
-            className={`absolute ${compact ? 'w-11 h-11' : 'w-12 h-12'} rounded-full border-2 flex items-center justify-center pointer-events-none shadow-lg transition-transform duration-75 ${
+            className={`absolute ${compact ? 'w-9 h-9 sm:w-11 sm:h-11' : 'w-12 h-12'} rounded-full border-2 flex items-center justify-center pointer-events-none shadow-lg transition-transform duration-75 ${
               isActive
                 ? 'bg-gradient-to-br from-sky-400 to-cyan-500 border-white text-slate-950 shadow-[0_0_16px_rgba(56,189,248,0.9)] scale-105'
                 : 'bg-gradient-to-br from-slate-800 to-slate-900 border-sky-400/70 text-sky-300'
@@ -200,7 +200,7 @@ export const VirtualJoystick: React.FC<VirtualJoystickProps> = ({
               transform: `translate(${knobPos.x}px, ${knobPos.y}px)`
             }}
           >
-            <Compass className={`w-5 h-5 ${isActive ? 'animate-spin-slow' : ''}`} />
+            <Compass className={`w-4 h-4 sm:w-5 sm:h-5 ${isActive ? 'animate-spin-slow' : ''}`} />
           </div>
         </div>
       </div>

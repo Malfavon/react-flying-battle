@@ -281,6 +281,7 @@ export function App() {
 
   const {
     isFullscreen,
+    isSupported: isFullscreenSupported,
     enterFullscreen,
     toggleFullscreen
   } = useFullscreen();
@@ -350,7 +351,7 @@ export function App() {
   const inputs = getInputs();
 
   return (
-    <div className="relative w-screen h-screen overflow-hidden bg-slate-950">
+    <div className="fixed inset-0 w-full h-full overflow-hidden bg-slate-950">
       {/* 3D WebGL Canvas */}
       <Canvas
         shadows
@@ -441,6 +442,7 @@ export function App() {
         onSpawnRunway={handleSpawnRunway}
         onSpawnInFlight={handleSpawnInFlight}
         onEnterFullscreen={enterFullscreen}
+        isFullscreenSupported={isFullscreenSupported}
       />
       <ControlsGuide isOpen={isHelpOpen} onClose={() => setIsHelpOpen(false)} />
       <LandingModal

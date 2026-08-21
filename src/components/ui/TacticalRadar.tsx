@@ -23,7 +23,7 @@ export const TacticalRadar: React.FC<TacticalRadarProps> = ({
   const northY = center - Math.cos(northAngleRad) * (radius + 2);
 
   return (
-    <div className="relative w-[104px] h-[104px] rounded-full bg-slate-950/75 backdrop-blur-md border border-sky-500/40 shadow-xl overflow-hidden pointer-events-auto select-none">
+    <div className="relative w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-slate-950/75 backdrop-blur-md border border-sky-500/40 shadow-xl overflow-hidden pointer-events-auto select-none">
       {/* Radar Background Grid & Range Rings */}
       <svg className="w-full h-full" viewBox={`0 0 ${size} ${size}`}>
         {/* Outer Ring (1000m) */}
