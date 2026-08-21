@@ -13,6 +13,8 @@ interface TargetReticle3DProps {
 }
 
 const BULLET_SPEED = 480; // m/s effective intercept speed
+const MAX_RETICLE_DISTANCE = 600; // Max effective combat reticle distance (meters)
+const CENTER_BOX_LIMIT = 0.30; // 30% box radius of screen center (NDC: [-0.30, 0.30])
 
 export const TargetReticle3D: React.FC<TargetReticle3DProps> = ({
   targetPosRef,
@@ -56,17 +58,32 @@ export const TargetReticle3D: React.FC<TargetReticle3DProps> = ({
     const distToPlane = tPos.distanceTo(lPos);
     const distToCam = tPos.distanceTo(camera.position);
 
-    // Hide if out of visual combat range or behind camera
-    const toTargetCam = new THREE.Vector3().subVectors(tPos, camera.position);
-    const camForward = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
-    const isTargetInFront = toTargetCam.dot(camForward) > 0;
-
-    if (distToPlane > 1500 || distToPlane < 2.0 || !isTargetInFront) {
+    // 1. Distance Limit: Reticle only appears within effective combat range (<= 600m)
+    if (distToPlane > MAX_RETICLE_DISTANCE || distToPlane < 2.0) {
       if (targetBoxGroupRef.current) targetBoxGroupRef.current.visible = false;
       if (leadPipGroupRef.current) leadPipGroupRef.current.visible = false;
       if (lineRef.current) lineRef.current.visible = false;
       return;
     }
+
+    // 2. Center 30% Screen Box Envelope Check
+    const toTargetCam = new THREE.Vector3().subVectors(tPos, camera.position);
+    const camForward = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+    const isTargetInFront = toTargetCam.dot(camForward) > 0;
+
+    if (!isTargetInFront) {
+      if (targetBoxGroupRef.current) targetBoxGroupRef.current.visible = false;
+      if (leadPipGroupRef.current) leadPipGroupRef.current.visible = false;
+      if (lineRef.current) lineRef.current.visible = false;
+      return;
+    }
+
+    // Project target to NDC coordinates (x: -1 to 1, y: -1 to 1)
+    const targetNDC = tPos.clone().project(camera);
+    const isTargetInCenterBox =
+      targetNDC.z <= 1.0 &&
+      Math.abs(targetNDC.x) <= CENTER_BOX_LIMIT &&
+      Math.abs(targetNDC.y) <= CENTER_BOX_LIMIT;
 
     // 1. Compute 3D Velocity & Intercept Solution
     const targetForward = new THREE.Vector3(0, 0, -1).applyQuaternion(tQuat);
@@ -102,14 +119,29 @@ export const TargetReticle3D: React.FC<TargetReticle3DProps> = ({
 
     leadPosRef.current.copy(leadPos);
 
-    // 2. Check if Local Player is Aiming Directly at Lead Pip
+    // 2. Check if either target aircraft OR lead pip is within center 30% box
+    const leadNDC = leadPos.clone().project(camera);
+    const isLeadInCenterBox =
+      leadNDC.z <= 1.0 &&
+      Math.abs(leadNDC.x) <= CENTER_BOX_LIMIT &&
+      Math.abs(leadNDC.y) <= CENTER_BOX_LIMIT;
+
+    const inAimEnvelope = isTargetInCenterBox || isLeadInCenterBox;
+    if (!inAimEnvelope) {
+      if (targetBoxGroupRef.current) targetBoxGroupRef.current.visible = false;
+      if (leadPipGroupRef.current) leadPipGroupRef.current.visible = false;
+      if (lineRef.current) lineRef.current.visible = false;
+      return;
+    }
+
+    // 3. Check if Local Player is Aiming Directly at Lead Pip
     const playerAim = new THREE.Vector3(0, 0, -1).applyQuaternion(localQuat);
     const toLead = new THREE.Vector3().subVectors(leadPos, lPos).normalize();
     const aimDot = playerAim.dot(toLead);
     const isLocked = hasLead && aimDot > 0.9975; // ~2.8 degree gunsight lock cone
     isLockedRef.current = isLocked;
 
-    // 3. Update Target Bracket Box in 3D
+    // 4. Update Target Bracket Box in 3D
     if (targetBoxGroupRef.current) {
       targetBoxGroupRef.current.visible = true;
       targetBoxGroupRef.current.position.copy(tPos);
