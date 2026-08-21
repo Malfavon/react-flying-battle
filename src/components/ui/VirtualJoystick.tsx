@@ -7,8 +7,8 @@ interface VirtualJoystickProps {
   compact?: boolean;
 }
 
-const DEFAULT_RADIUS = 50;
-const COMPACT_RADIUS = 42;
+const DEFAULT_RADIUS = 48;
+const COMPACT_RADIUS = 38;
 const DEADZONE = 0.08; // 8% deadzone to avoid micro-jitter
 
 export const VirtualJoystick: React.FC<VirtualJoystickProps> = ({

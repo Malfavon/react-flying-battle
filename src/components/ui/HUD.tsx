@@ -101,7 +101,7 @@ export const HUD: React.FC<HUDProps> = ({
   const pilotsCount = multiplayer ? multiplayer.onlineCount : 1;
 
   return (
-    <div className="absolute inset-0 pointer-events-none select-none flex flex-col justify-between p-2.5 sm:p-4 z-20 overflow-hidden font-mono">
+    <div className="absolute inset-0 pointer-events-none select-none flex flex-col justify-between p-2 sm:p-3.5 pt-[max(0.5rem,env(safe-area-inset-top))] pb-[max(0.5rem,env(safe-area-inset-bottom))] pl-[max(0.5rem,env(safe-area-inset-left))] pr-[max(0.5rem,env(safe-area-inset-right))] z-20 overflow-hidden font-mono">
       {/* Combat HUD Overlay: Lead Gunsight, Target Brackets, Screen-Edge Threats & Hitmarker */}
       <CombatHUDOverlay
         targets={targetingData?.targets || []}
@@ -128,11 +128,11 @@ export const HUD: React.FC<HUDProps> = ({
       {/* ========================================================================= */}
       {/* TOP BAR: COMPACT STATUS, HEALTH BAR, HEADING & TOOLBAR                    */}
       {/* ========================================================================= */}
-      <div className="flex items-center justify-between w-full pointer-events-none gap-2">
+      <div className="flex items-center justify-between w-full pointer-events-none gap-1.5 sm:gap-2">
         {/* Left Cluster: Status + Health Bar */}
         <div className="flex items-center gap-1.5 sm:gap-2">
           {/* Status Pill */}
-          <div className="flex items-center gap-1.5 sm:gap-2.5 bg-slate-950/60 backdrop-blur-md px-2.5 py-1.5 rounded-xl border border-sky-500/30 text-[11px] shadow-lg pointer-events-auto">
+          <div className="flex items-center gap-1.5 sm:gap-2 bg-slate-950/70 backdrop-blur-md px-2.5 py-1.5 rounded-xl border border-sky-500/30 text-[11px] shadow-lg pointer-events-auto">
             <span className={`font-bold ${telemetry.isGrounded ? 'text-amber-400' : 'text-emerald-400'}`}>
               {telemetry.isGrounded ? 'GROUND' : 'AIR'}
             </span>
@@ -152,7 +152,7 @@ export const HUD: React.FC<HUDProps> = ({
           </div>
 
           {/* Health Bar Pill */}
-          <div className="flex items-center gap-2 bg-slate-950/70 backdrop-blur-md px-3 py-1.5 rounded-xl border border-sky-500/30 text-[11px] shadow-lg pointer-events-auto">
+          <div className="flex items-center gap-1.5 sm:gap-2 bg-slate-950/70 backdrop-blur-md px-2.5 sm:px-3 py-1.5 rounded-xl border border-sky-500/30 text-[11px] shadow-lg pointer-events-auto">
             <Shield className={`w-3.5 h-3.5 ${healthPct > 50 ? 'text-emerald-400' : healthPct > 25 ? 'text-amber-400' : 'text-red-400 animate-pulse'}`} />
             <div className="flex flex-col gap-0.5">
               <div className="flex items-center justify-between text-[10px] font-bold">
@@ -161,7 +161,7 @@ export const HUD: React.FC<HUDProps> = ({
                   {health}/100
                 </span>
               </div>
-              <div className="w-20 sm:w-28 bg-slate-800/90 rounded-full h-1.5 overflow-hidden border border-slate-700/60">
+              <div className="w-16 sm:w-24 bg-slate-800/90 rounded-full h-1.5 overflow-hidden border border-slate-700/60">
                 <div
                   className={`h-full transition-all duration-150 ${
                     healthPct > 50
@@ -178,7 +178,7 @@ export const HUD: React.FC<HUDProps> = ({
         </div>
 
         {/* Center: Minimalist Compass Heading Pip */}
-        <div className="hidden sm:flex items-center gap-1.5 bg-slate-950/60 backdrop-blur-md px-3 py-1.5 rounded-xl border border-sky-500/30 shadow-lg pointer-events-auto">
+        <div className="hidden md:flex items-center gap-1.5 bg-slate-950/60 backdrop-blur-md px-3 py-1.5 rounded-xl border border-sky-500/30 shadow-lg pointer-events-auto">
           <span className="text-[10px] text-slate-400 font-bold tracking-wider">HDG</span>
           <span className="text-sm font-bold text-sky-400 tracking-wider">
             {headingFormatted}°
@@ -204,7 +204,7 @@ export const HUD: React.FC<HUDProps> = ({
           {onToggleFullscreen && (
             <button
               onClick={onToggleFullscreen}
-              className="p-2 bg-slate-950/60 hover:bg-slate-800 backdrop-blur-md text-sky-400 hover:text-white rounded-xl border border-sky-500/30 transition-colors shadow-lg"
+              className="p-1.5 sm:p-2 bg-slate-950/70 hover:bg-slate-800 backdrop-blur-md text-sky-400 hover:text-white rounded-xl border border-sky-500/30 transition-colors shadow-lg active:scale-95"
               title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}
             >
               {isFullscreen ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
@@ -212,10 +212,10 @@ export const HUD: React.FC<HUDProps> = ({
           )}
           <button
             onClick={() => setShowJoystick((prev) => !prev)}
-            className={`p-2 rounded-xl border backdrop-blur-md transition-colors shadow-lg ${
+            className={`p-1.5 sm:p-2 rounded-xl border backdrop-blur-md transition-colors shadow-lg active:scale-95 ${
               showJoystick
                 ? 'bg-sky-600/40 border-sky-400 text-sky-300'
-                : 'bg-slate-950/60 hover:bg-slate-800 border-sky-500/30 text-slate-400'
+                : 'bg-slate-950/70 hover:bg-slate-800 border-sky-500/30 text-slate-400'
             }`}
             title="Toggle Virtual Joystick"
           >
@@ -223,28 +223,28 @@ export const HUD: React.FC<HUDProps> = ({
           </button>
           <button
             onClick={cycleCamera}
-            className="p-2 bg-slate-950/60 hover:bg-slate-800 backdrop-blur-md text-sky-400 hover:text-white rounded-xl border border-sky-500/30 transition-colors shadow-lg"
+            className="p-1.5 sm:p-2 bg-slate-950/70 hover:bg-slate-800 backdrop-blur-md text-sky-400 hover:text-white rounded-xl border border-sky-500/30 transition-colors shadow-lg active:scale-95"
             title="Switch Camera (C)"
           >
             <Camera className="w-3.5 h-3.5" />
           </button>
           <button
             onClick={toggleMute}
-            className="p-2 bg-slate-950/60 hover:bg-slate-800 backdrop-blur-md text-sky-400 hover:text-white rounded-xl border border-sky-500/30 transition-colors shadow-lg"
+            className="p-1.5 sm:p-2 bg-slate-950/70 hover:bg-slate-800 backdrop-blur-md text-sky-400 hover:text-white rounded-xl border border-sky-500/30 transition-colors shadow-lg active:scale-95"
             title="Mute / Unmute Audio (M)"
           >
             {isMuted ? <VolumeX className="w-3.5 h-3.5 text-red-400" /> : <Volume2 className="w-3.5 h-3.5" />}
           </button>
           <button
             onClick={onReset}
-            className="p-2 bg-slate-950/60 hover:bg-slate-800 backdrop-blur-md text-sky-400 hover:text-white rounded-xl border border-sky-500/30 transition-colors shadow-lg"
+            className="p-1.5 sm:p-2 bg-slate-950/70 hover:bg-slate-800 backdrop-blur-md text-sky-400 hover:text-white rounded-xl border border-sky-500/30 transition-colors shadow-lg active:scale-95"
             title="Reset Flight (R)"
           >
             <RotateCcw className="w-3.5 h-3.5" />
           </button>
           <button
             onClick={onOpenHelp}
-            className="p-2 bg-sky-600/90 hover:bg-sky-500 text-white rounded-xl border border-sky-400 shadow-lg shadow-sky-500/20 transition-colors"
+            className="p-1.5 sm:p-2 bg-sky-600/90 hover:bg-sky-500 text-white rounded-xl border border-sky-400 shadow-lg shadow-sky-500/20 transition-colors active:scale-95"
             title="Flight Controls Guide (H)"
           >
             <HelpCircle className="w-3.5 h-3.5" />
@@ -258,13 +258,13 @@ export const HUD: React.FC<HUDProps> = ({
       <div className="relative flex-1 flex items-center justify-center pointer-events-none">
         {/* Stall Warning Flashing Banner */}
         {telemetry.isStalling && !telemetry.isGrounded && (
-          <div className="absolute top-2 bg-red-600/90 border border-white px-4 py-1.5 rounded-xl text-white font-bold text-xs sm:text-sm tracking-widest flex items-center gap-2 shadow-[0_0_20px_rgba(239,68,68,0.9)] animate-bounce z-30">
-            <AlertTriangle className="w-4 h-4 animate-pulse" />
+          <div className="absolute top-2 bg-red-600/90 border border-white px-3 sm:px-4 py-1 sm:py-1.5 rounded-xl text-white font-bold text-[11px] sm:text-sm tracking-wider flex items-center gap-1.5 shadow-[0_0_20px_rgba(239,68,68,0.9)] animate-bounce z-30">
+            <AlertTriangle className="w-3.5 h-3.5 animate-pulse" />
             <span>STALL WARNING! PUSH NOSE DOWN / POWER UP</span>
           </div>
         )}
 
-        {/* Minimalist Transparent Horizon Pitch Lines (0% solid background!) */}
+        {/* Minimalist Transparent Horizon Pitch Lines */}
         <div className="relative w-48 h-48 flex items-center justify-center overflow-hidden pointer-events-none">
           {/* Rotating Pitch Ladder */}
           <div
@@ -301,10 +301,10 @@ export const HUD: React.FC<HUDProps> = ({
         </div>
 
         {/* Left Margin: Slim Airspeed Tape */}
-        <div className="absolute left-1 sm:left-2 flex flex-col items-end bg-slate-950/60 backdrop-blur-md px-2.5 py-1.5 rounded-xl border border-sky-500/25 shadow-lg">
+        <div className="absolute left-1 sm:left-2 flex flex-col items-end bg-slate-950/60 backdrop-blur-md px-2 sm:px-2.5 py-1.5 rounded-xl border border-sky-500/25 shadow-lg">
           <span className="text-[8px] text-slate-400 font-semibold tracking-wider">SPEED</span>
           <div className="flex items-baseline gap-0.5">
-            <span className="text-base sm:text-lg font-bold text-sky-400">{telemetry.airspeedKnots}</span>
+            <span className="text-sm sm:text-lg font-bold text-sky-400">{telemetry.airspeedKnots}</span>
             <span className="text-[9px] text-sky-400">KT</span>
           </div>
           <span className="text-[8px] text-slate-400">
@@ -313,10 +313,10 @@ export const HUD: React.FC<HUDProps> = ({
         </div>
 
         {/* Right Margin: Slim Altitude Tape + Vertical Speed */}
-        <div className="absolute right-1 sm:right-2 flex flex-col items-start bg-slate-950/60 backdrop-blur-md px-2.5 py-1.5 rounded-xl border border-sky-500/25 shadow-lg">
+        <div className="absolute right-1 sm:right-2 flex flex-col items-start bg-slate-950/60 backdrop-blur-md px-2 sm:px-2.5 py-1.5 rounded-xl border border-sky-500/25 shadow-lg">
           <span className="text-[8px] text-slate-400 font-semibold tracking-wider">ALT</span>
           <div className="flex items-baseline gap-0.5">
-            <span className="text-base sm:text-lg font-bold text-sky-400">{telemetry.altitudeFeet}</span>
+            <span className="text-sm sm:text-lg font-bold text-sky-400">{telemetry.altitudeFeet}</span>
             <span className="text-[9px] text-sky-400">FT</span>
           </div>
           <div className="flex items-center gap-1 text-[8px] text-slate-400">
@@ -339,18 +339,21 @@ export const HUD: React.FC<HUDProps> = ({
       </div>
 
       {/* ========================================================================= */}
-      {/* BOTTOM BAR: LEFT THUMB (THROTTLE/FLAPS) & RIGHT THUMB (FIRE/JOYSTICK/BRAKES)*/}
+      {/* BOTTOM BAR (INVERTED ERGONOMICS):                                         */}
+      {/* LEFT THUMB: Virtual Joystick & Rudder Pedals                               */}
+      {/* RIGHT THUMB: Throttle Slider, Tactical Fire, Wheel Brakes & Flaps         */}
       {/* ========================================================================= */}
       <div className="flex items-end justify-between w-full pointer-events-none gap-2">
-        {/* Bottom Left Cluster: Slim Throttle + Horizontal Flap Pill */}
+        {/* Bottom Left Cluster: Virtual Flight Stick & Yaw (Left Thumb) */}
         <div className="flex items-end gap-1.5 pointer-events-auto">
-          <ThrottleSlider throttle={telemetry.throttle} setThrottle={setThrottle} compact={true} />
-          <FlapSelector flapStage={telemetry.flapStage} setFlapStage={setFlapStage} compact={true} />
+          {showJoystick && (
+            <VirtualJoystick onAxesChange={setVirtualAxes} compact={true} />
+          )}
         </div>
 
-        {/* Bottom Right Cluster: Wheel Brakes, Tactical FIRE Button & Translucent Joystick */}
-        <div className="flex items-end gap-1.5 pointer-events-auto">
-          {/* Wheel Brakes & Gunfire Action Cluster */}
+        {/* Bottom Right Cluster: Throttle, Flaps, Fire & Wheel Brakes (Right Thumb) */}
+        <div className="flex items-end gap-2 pointer-events-auto">
+          {/* Action Buttons: Tactical FIRE & Wheel Brakes */}
           <div className="flex flex-col items-end gap-1.5 mb-1">
             {/* Tactical Machine Gun FIRE Button */}
             <button
@@ -370,16 +373,16 @@ export const HUD: React.FC<HUDProps> = ({
                 setIsTouchFiring(false);
                 setIsFiringVirtual?.(false);
               }}
-              className={`px-3 py-2 rounded-xl border font-mono text-[10px] font-bold transition-all shadow-lg flex items-center gap-1.5 select-none touch-none ${
+              className={`px-3.5 py-2 rounded-xl border font-mono text-[11px] font-bold transition-all shadow-lg flex items-center gap-1.5 select-none touch-none active:scale-95 ${
                 isFiring || isTouchFiring
-                  ? 'bg-amber-600/90 border-amber-300 text-white shadow-[0_0_18px_rgba(245,158,11,0.9)] scale-95'
-                  : 'bg-slate-950/70 hover:bg-slate-800 border-amber-500/40 text-amber-300'
+                  ? 'bg-amber-600/95 border-amber-300 text-white shadow-[0_0_18px_rgba(245,158,11,0.9)] scale-95'
+                  : 'bg-slate-950/75 hover:bg-slate-800 border-amber-500/40 text-amber-300'
               }`}
               style={{ touchAction: 'none' }}
-              title="Fire Machine Guns (Hold F / Tap)"
+              title="Fire Machine Guns (Hold / Tap)"
             >
               <Crosshair className={`w-3.5 h-3.5 ${isFiring || isTouchFiring ? 'text-amber-200 animate-spin' : 'text-amber-400'}`} />
-              <span>{isFiring || isTouchFiring ? 'FIRING' : 'FIRE (F)'}</span>
+              <span>{isFiring || isTouchFiring ? 'FIRING' : 'FIRE'}</span>
             </button>
 
             {/* Wheel Brakes Trigger Button */}
@@ -388,23 +391,26 @@ export const HUD: React.FC<HUDProps> = ({
               onMouseUp={() => setIsBraking(false)}
               onTouchStart={() => setIsBraking(true)}
               onTouchEnd={() => setIsBraking(false)}
-              className={`px-2.5 py-2 rounded-xl border font-mono text-[10px] font-bold transition-all shadow-lg flex items-center gap-1 select-none touch-none ${
+              className={`px-3 py-1.5 rounded-xl border font-mono text-[10px] font-bold transition-all shadow-lg flex items-center gap-1 select-none touch-none active:scale-95 ${
                 isBraking
-                  ? 'bg-red-600/60 border-red-400 text-white shadow-[0_0_16px_rgba(239,68,68,0.7)] scale-95'
-                  : 'bg-slate-950/60 hover:bg-slate-800 border-sky-500/30 text-slate-300'
+                  ? 'bg-red-600/70 border-red-400 text-white shadow-[0_0_16px_rgba(239,68,68,0.7)] scale-95'
+                  : 'bg-slate-950/70 hover:bg-slate-800 border-sky-500/30 text-slate-300'
               }`}
               style={{ touchAction: 'none' }}
-              title="Ground Wheel Brakes (Hold Space / Tap)"
+              title="Ground Wheel Brakes (Hold to Stop)"
             >
-              <Disc className={`w-3.5 h-3.5 ${isBraking ? 'text-red-300 animate-spin' : 'text-slate-400'}`} />
+              <Disc className={`w-3 h-3 ${isBraking ? 'text-red-300 animate-spin' : 'text-slate-400'}`} />
               <span>{isBraking ? 'BRAKING' : 'BRAKE'}</span>
             </button>
+
+            {/* Compact Flap Pill Selector */}
+            <FlapSelector flapStage={telemetry.flapStage} setFlapStage={setFlapStage} compact={true} />
           </div>
 
-          {/* Virtual Flight Joystick */}
-          {showJoystick && (
-            <VirtualJoystick onAxesChange={setVirtualAxes} compact={true} />
-          )}
+          {/* Vertical Throttle Slider */}
+          <div className="flex items-end">
+            <ThrottleSlider throttle={telemetry.throttle} setThrottle={setThrottle} compact={true} />
+          </div>
         </div>
       </div>
     </div>
