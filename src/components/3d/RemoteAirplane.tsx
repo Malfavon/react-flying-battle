@@ -5,13 +5,15 @@ import * as THREE from 'three';
 import { RemotePlayer } from '../../types/flight';
 import { FLAP_CONFIGS } from '../../hooks/useFlightPhysics';
 import { CrashParticles } from './CrashParticles';
+import { TargetReticle3D } from './TargetReticle3D';
 
 interface RemoteAirplaneProps {
   player: RemotePlayer;
   localPos: [number, number, number];
+  localQuat: THREE.Quaternion;
 }
 
-export const RemoteAirplane: React.FC<RemoteAirplaneProps> = ({ player, localPos }) => {
+export const RemoteAirplane: React.FC<RemoteAirplaneProps> = ({ player, localPos, localQuat }) => {
   const groupRef = useRef<THREE.Group>(null);
   const propRef = useRef<THREE.Group>(null);
   const leftFlapRef = useRef<THREE.Mesh>(null);
@@ -139,7 +141,8 @@ export const RemoteAirplane: React.FC<RemoteAirplaneProps> = ({ player, localPos
   const healthPct = Math.max(0, Math.min(100, health));
 
   return (
-    <group ref={groupRef} position={player.position} quaternion={new THREE.Quaternion(...player.quaternion)}>
+    <>
+      <group ref={groupRef} position={player.position} quaternion={new THREE.Quaternion(...player.quaternion)}>
       {/* Floating Callsign, Mini Health Bar & Distance Tag */}
       <Html position={[0, 2.4, 0]} center distanceFactor={35} style={{ pointerEvents: 'none', userSelect: 'none' }}>
         <div className="flex flex-col items-center gap-1 whitespace-nowrap font-mono pointer-events-none">
@@ -219,6 +222,16 @@ export const RemoteAirplane: React.FC<RemoteAirplaneProps> = ({ player, localPos
       <mesh position={[3.85, 0.15, -0.3]}>
         <boxGeometry args={[0.15, 0.2, 1.1]} />
         <meshStandardMaterial color="#22c55e" emissive="#22c55e" emissiveIntensity={0.6} />
+      </mesh>
+
+      {/* Twin Wing Gun Barrels */}
+      <mesh position={[-1.8, 0.05, -0.75]} rotation={[Math.PI / 2, 0, 0]} castShadow>
+        <cylinderGeometry args={[0.04, 0.04, 0.8, 8]} />
+        <meshStandardMaterial color="#334155" metalness={0.8} roughness={0.2} />
+      </mesh>
+      <mesh position={[1.8, 0.05, -0.75]} rotation={[Math.PI / 2, 0, 0]} castShadow>
+        <cylinderGeometry args={[0.04, 0.04, 0.8, 8]} />
+        <meshStandardMaterial color="#334155" metalness={0.8} roughness={0.2} />
       </mesh>
 
       {/* Flaps */}
@@ -329,5 +342,17 @@ export const RemoteAirplane: React.FC<RemoteAirplaneProps> = ({ player, localPos
         </mesh>
       </group>
     </group>
+
+    {/* 3D Frame-Synced Target Reticle & Predictive Lead Pip */}
+    <TargetReticle3D
+      targetPosRef={currentPos}
+      targetQuatRef={currentQuat}
+      targetSpeed={player.forwardSpeed || 0}
+      localPos={localPos}
+      localQuat={localQuat}
+      accentColor={accentColor}
+      isCrashed={!!player.isCrashed}
+    />
+  </>
   );
 };

@@ -119,6 +119,7 @@ export const WorldScene: React.FC<WorldSceneProps> = ({
           key={player.id}
           player={player}
           localPos={planePos}
+          localQuat={planeQuat}
         />
       ))}
 

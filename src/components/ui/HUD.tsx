@@ -16,10 +16,12 @@ import {
   Shield,
   Crosshair
 } from 'lucide-react';
-import { CameraMode, FlightTelemetry, FlapStage, LocalPlayerIdentity, RemotePlayer } from '../../types/flight';
+import { CameraMode, FlightTelemetry, FlapStage, LocalPlayerIdentity, RemotePlayer, TacticalRadarData } from '../../types/flight';
 import { ThrottleSlider } from './ThrottleSlider';
 import { FlapSelector } from './FlapSelector';
 import { VirtualJoystick } from './VirtualJoystick';
+import { TacticalRadar } from './TacticalRadar';
+import { CombatHUDOverlay } from './CombatHUDOverlay';
 
 interface HUDProps {
   telemetry: FlightTelemetry;
@@ -39,6 +41,8 @@ interface HUDProps {
   onOpenHelp: () => void;
   isFullscreen?: boolean;
   onToggleFullscreen?: () => void;
+  targetingData?: TacticalRadarData;
+  hitMarkerTime?: number;
   multiplayer?: {
     isConnected: boolean;
     onlineCount: number;
@@ -65,9 +69,12 @@ export const HUD: React.FC<HUDProps> = ({
   onOpenHelp,
   isFullscreen = false,
   onToggleFullscreen,
+  targetingData,
+  hitMarkerTime = 0,
   multiplayer
 }) => {
   const [showJoystick, setShowJoystick] = useState<boolean>(true);
+  const [showRadar, setShowRadar] = useState<boolean>(true);
   const [isTouchFiring, setIsTouchFiring] = useState<boolean>(false);
 
   const health = telemetry.health !== undefined ? telemetry.health : 100;
@@ -95,9 +102,27 @@ export const HUD: React.FC<HUDProps> = ({
 
   return (
     <div className="absolute inset-0 pointer-events-none select-none flex flex-col justify-between p-2.5 sm:p-4 z-20 overflow-hidden font-mono">
+      {/* Combat HUD Overlay: Lead Gunsight, Target Brackets, Screen-Edge Threats & Hitmarker */}
+      <CombatHUDOverlay
+        targets={targetingData?.targets || []}
+        primaryTarget={targetingData?.primaryTarget || null}
+        hitMarkerTime={hitMarkerTime}
+      />
+
       {/* Damage Screen Flash Vignette */}
       {damageFlash && (
         <div className="absolute inset-0 border-4 sm:border-8 border-red-600/80 bg-red-600/15 pointer-events-none z-40 animate-pulse shadow-[inset_0_0_50px_rgba(239,68,68,0.5)]" />
+      )}
+
+      {/* Tactical Radar Widget (Top Right below toolbar) */}
+      {showRadar && (
+        <div className="absolute top-14 right-2.5 sm:right-4 z-30 pointer-events-auto">
+          <TacticalRadar
+            targets={targetingData?.targets || []}
+            primaryTarget={targetingData?.primaryTarget || null}
+            playerYawDeg={telemetry.yawDeg}
+          />
+        </div>
       )}
 
       {/* ========================================================================= */}
@@ -165,6 +190,17 @@ export const HUD: React.FC<HUDProps> = ({
 
         {/* Right: Quick Action Controls Toolbar */}
         <div className="flex items-center gap-1 sm:gap-1.5 pointer-events-auto">
+          <button
+            onClick={() => setShowRadar((prev) => !prev)}
+            className={`p-2 rounded-xl border backdrop-blur-md transition-colors shadow-lg ${
+              showRadar
+                ? 'bg-sky-600/40 border-sky-400 text-sky-300'
+                : 'bg-slate-950/60 hover:bg-slate-800 border-sky-500/30 text-slate-400'
+            }`}
+            title="Toggle Tactical Radar"
+          >
+            <Crosshair className="w-3.5 h-3.5" />
+          </button>
           {onToggleFullscreen && (
             <button
               onClick={onToggleFullscreen}
