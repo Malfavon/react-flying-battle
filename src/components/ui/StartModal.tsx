@@ -6,13 +6,15 @@ interface StartModalProps {
   onSpawnRunway: () => void;
   onSpawnInFlight: () => void;
   onEnterFullscreen?: () => void;
+  isFullscreenSupported?: boolean;
 }
 
 export const StartModal: React.FC<StartModalProps> = ({
   isOpen,
   onSpawnRunway,
   onSpawnInFlight,
-  onEnterFullscreen
+  onEnterFullscreen,
+  isFullscreenSupported = true
 }) => {
   const [fullscreenOnLaunch, setFullscreenOnLaunch] = useState<boolean>(true);
 
@@ -112,21 +114,31 @@ export const StartModal: React.FC<StartModalProps> = ({
         </div>
 
         {/* Fullscreen Option Row */}
-        <div className="flex items-center justify-between bg-slate-800/40 border border-slate-700/50 rounded-xl p-2 sm:p-2.5 mb-3">
-          <label className="flex items-center gap-2 cursor-pointer select-none text-xs font-mono text-slate-300">
-            <input
-              type="checkbox"
-              checked={fullscreenOnLaunch}
-              onChange={(e) => setFullscreenOnLaunch(e.target.checked)}
-              className="w-4 h-4 rounded border-slate-600 bg-slate-800 text-sky-500 focus:ring-sky-500 cursor-pointer"
-            />
-            <span className="flex items-center gap-1.5 font-semibold text-white">
+        {isFullscreenSupported ? (
+          <div className="flex items-center justify-between bg-slate-800/40 border border-slate-700/50 rounded-xl p-2 sm:p-2.5 mb-3">
+            <label className="flex items-center gap-2 cursor-pointer select-none text-xs font-mono text-slate-300">
+              <input
+                type="checkbox"
+                checked={fullscreenOnLaunch}
+                onChange={(e) => setFullscreenOnLaunch(e.target.checked)}
+                className="w-4 h-4 rounded border-slate-600 bg-slate-800 text-sky-500 focus:ring-sky-500 cursor-pointer"
+              />
+              <span className="flex items-center gap-1.5 font-semibold text-white">
+                <Maximize2 className="w-3.5 h-3.5 text-sky-400" />
+                Launch in Fullscreen Mode
+              </span>
+            </label>
+            <span className="text-[10px] text-slate-400 font-mono hidden sm:inline">Hides browser address bar</span>
+          </div>
+        ) : (
+          <div className="flex items-center justify-between bg-slate-800/30 border border-slate-700/40 rounded-xl p-2 sm:p-2.5 mb-3 text-[10px] sm:text-[11px] font-mono text-slate-400">
+            <span className="flex items-center gap-1.5 text-sky-300 font-semibold">
               <Maximize2 className="w-3.5 h-3.5 text-sky-400" />
-              Launch in Fullscreen Mode
+              iPhone tip:
             </span>
-          </label>
-          <span className="text-[10px] text-slate-400 font-mono hidden sm:inline">Hides browser address bar</span>
-        </div>
+            <span>Tap Share → "Add to Home Screen" for Fullscreen</span>
+          </div>
+        )}
 
         {/* Footer Quick Controls Hint */}
         <div className="text-center text-[10px] sm:text-[11px] font-mono text-slate-500 border-t border-slate-800/80 pt-2.5 flex items-center justify-center gap-3 sm:gap-4">
