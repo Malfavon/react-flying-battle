@@ -1,6 +1,5 @@
 import React, { useRef, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
-import { Html } from '@react-three/drei';
 import * as THREE from 'three';
 import { RemotePlayer } from '../../types/flight';
 import { FLAP_CONFIGS } from '../../hooks/useFlightPhysics';
@@ -31,15 +30,6 @@ export const RemoteAirplane: React.FC<RemoteAirplaneProps> = ({ player, localPos
   const targetQuat = useMemo(() => new THREE.Quaternion(...player.quaternion), [player.quaternion]);
   const currentPos = useRef<THREE.Vector3>(new THREE.Vector3(...player.position));
   const currentQuat = useRef<THREE.Quaternion>(new THREE.Quaternion(...player.quaternion));
-
-  // Compute distance to local player for nameplate display
-  const distance = Math.round(
-    Math.sqrt(
-      Math.pow(player.position[0] - localPos[0], 2) +
-      Math.pow(player.position[1] - localPos[1], 2) +
-      Math.pow(player.position[2] - localPos[2], 2)
-    )
-  );
 
   useFrame((_, delta) => {
     if (player.isCrashed) return;
@@ -137,50 +127,10 @@ export const RemoteAirplane: React.FC<RemoteAirplaneProps> = ({ player, localPos
   const bodyColor = player.color || '#f8fafc';
   const accentColor = player.accentColor || '#0284c7';
   const wingColor = player.wingColor || '#f1f5f9';
-  const health = player.health !== undefined ? player.health : 100;
-  const healthPct = Math.max(0, Math.min(100, health));
 
   return (
     <>
       <group ref={groupRef} position={player.position} quaternion={new THREE.Quaternion(...player.quaternion)}>
-      {/* Floating Callsign, Mini Health Bar & Distance Tag */}
-      <Html position={[0, 2.4, 0]} center distanceFactor={35} style={{ pointerEvents: 'none', userSelect: 'none' }}>
-        <div className="flex flex-col items-center gap-1 whitespace-nowrap font-mono pointer-events-none">
-          <div
-            className="px-2 py-0.5 rounded-md text-[11px] font-bold text-white shadow-lg border flex items-center gap-1.5 backdrop-blur-md"
-            style={{
-              backgroundColor: 'rgba(15, 23, 42, 0.85)',
-              borderColor: accentColor,
-              boxShadow: `0 0 12px ${accentColor}55`
-            }}
-          >
-            <span
-              className="w-2 h-2 rounded-full animate-pulse"
-              style={{ backgroundColor: accentColor }}
-            />
-            <span>{player.callsign}</span>
-          </div>
-
-          {/* Mini Health Bar */}
-          <div className="w-20 bg-slate-950/90 rounded-full h-1.5 border border-slate-700/80 overflow-hidden shadow">
-            <div
-              className={`h-full transition-all duration-150 ${
-                healthPct > 50 ? 'bg-emerald-400' : healthPct > 25 ? 'bg-amber-400' : 'bg-red-500 animate-pulse'
-              }`}
-              style={{ width: `${healthPct}%` }}
-            />
-          </div>
-
-          <div className="text-[9px] font-semibold text-slate-300 bg-slate-900/80 px-1.5 py-0.2 rounded border border-slate-700/60 shadow flex items-center gap-1">
-            <span>{distance}m</span>
-            <span className="text-slate-500">•</span>
-            <span className={healthPct > 50 ? 'text-emerald-400 font-bold' : healthPct > 25 ? 'text-amber-400 font-bold' : 'text-red-400 font-bold animate-pulse'}>
-              {health} HP
-            </span>
-          </div>
-        </div>
-      </Html>
-
       {/* Fuselage Main Body */}
       <mesh position={[0, 0, 0]} castShadow receiveShadow>
         <boxGeometry args={[0.9, 0.9, 4.4]} />

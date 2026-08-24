@@ -28,6 +28,7 @@ interface WorldSceneProps {
   bulletsRef?: React.RefObject<BulletsHandle>;
   localId?: string;
   onBulletHit?: (targetId: string, bulletId: string, damage: number) => void;
+  onLocalHit?: (damage: number, shooterId: string) => void;
 }
 
 export const WorldScene: React.FC<WorldSceneProps> = ({
@@ -45,7 +46,8 @@ export const WorldScene: React.FC<WorldSceneProps> = ({
   remotePlayers = [],
   bulletsRef,
   localId,
-  onBulletHit
+  onBulletHit,
+  onLocalHit
 }) => {
   const planeGroupRef = useRef<THREE.Group>(null);
   const planePosVec = new THREE.Vector3(...planePos);
@@ -136,7 +138,9 @@ export const WorldScene: React.FC<WorldSceneProps> = ({
         ref={bulletsRef}
         remotePlayers={remotePlayers}
         localId={localId}
+        localPos={planePos}
         onBulletHit={onBulletHit}
+        onLocalHit={onLocalHit}
       />
     </>
   );

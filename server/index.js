@@ -1,5 +1,6 @@
 import http from 'http';
 import { Server } from 'socket.io';
+import { initBanditManager } from './banditManager.js';
 
 const PORT = process.env.PORT || 3001;
 const allowedOrigins = process.env.CLIENT_ORIGIN
@@ -9,6 +10,7 @@ const allowedOrigins = process.env.CLIENT_ORIGIN
 const server = http.createServer((req, res) => {
   // Health check & status endpoint for Render/Railway/Fly.io uptime monitors
   if (req.url === '/health' || req.url === '/') {
+    const humanPilots = Array.from(players.values()).filter((p) => !p.isBot).length;
     res.writeHead(200, {
       'Content-Type': 'application/json',
       'Access-Control-Allow-Origin': '*'
@@ -17,7 +19,7 @@ const server = http.createServer((req, res) => {
       JSON.stringify({
         status: 'ok',
         service: 'Flight Simulator Socket.io Server',
-        pilotsOnline: players.size,
+        pilotsOnline: humanPilots,
         uptimeSeconds: Math.floor(process.uptime()),
         timestamp: new Date().toISOString()
       })
@@ -59,6 +61,9 @@ const CALLSIGNS = [
 
 let callsignIndex = 0;
 const players = new Map();
+
+// Initialize server-side AI Bandit Bot Manager
+const banditManager = initBanditManager(io, players);
 
 io.on('connection', (socket) => {
   const livery = LIVERIES[players.size % LIVERIES.length];
@@ -151,6 +156,13 @@ io.on('connection', (socket) => {
   // Handle bullet hit & combat damage
   socket.on('bulletHit', (hitData) => {
     const { targetId, bulletId, damage = 8 } = hitData;
+
+    // Check if hit target is the AI Bandit Bot
+    if (targetId === 'bot-bandit-01') {
+      banditManager.handleBotDamage(socket.id, damage);
+      return;
+    }
+
     const target = players.get(targetId);
     const shooter = players.get(socket.id);
     if (!target || target.isCrashed) return;
@@ -229,6 +241,7 @@ server.listen(PORT, '0.0.0.0', () => {
 // Graceful shutdown handling for cloud platforms (Render / Railway / Fly.io / Kubernetes)
 const handleShutdown = (signal) => {
   console.log(`\n[Server] Received ${signal}. Shutting down gracefully...`);
+  banditManager.cleanup();
   io.close(() => {
     console.log('[Server] Socket.io connections closed.');
     server.close(() => {

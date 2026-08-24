@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import { Plane, Compass, ArrowUpRight, CloudSun, Maximize2 } from 'lucide-react';
+import { Plane, Compass, ArrowUpRight, CloudSun, Maximize2, Users, Bot } from 'lucide-react';
 
 interface StartModalProps {
   isOpen: boolean;
-  onSpawnRunway: () => void;
-  onSpawnInFlight: () => void;
+  onSpawnRunway: (enableMultiplayer: boolean) => void;
+  onSpawnInFlight: (enableMultiplayer: boolean) => void;
   onEnterFullscreen?: () => void;
   isFullscreenSupported?: boolean;
 }
@@ -17,6 +17,7 @@ export const StartModal: React.FC<StartModalProps> = ({
   isFullscreenSupported = true
 }) => {
   const [fullscreenOnLaunch, setFullscreenOnLaunch] = useState<boolean>(true);
+  const [enableMultiplayer, setEnableMultiplayer] = useState<boolean>(false);
 
   if (!isOpen) return null;
 
@@ -24,14 +25,14 @@ export const StartModal: React.FC<StartModalProps> = ({
     if (fullscreenOnLaunch && onEnterFullscreen) {
       onEnterFullscreen();
     }
-    onSpawnRunway();
+    onSpawnRunway(enableMultiplayer);
   };
 
   const handleInFlight = () => {
     if (fullscreenOnLaunch && onEnterFullscreen) {
       onEnterFullscreen();
     }
-    onSpawnInFlight();
+    onSpawnInFlight(enableMultiplayer);
   };
 
   return (
@@ -111,6 +112,33 @@ export const StartModal: React.FC<StartModalProps> = ({
               <span className="group-hover:translate-x-1 transition-transform">→</span>
             </div>
           </button>
+        </div>
+
+        {/* Mode Selector Option Row */}
+        <div className="flex items-center justify-between bg-slate-800/40 border border-slate-700/50 rounded-xl p-2 sm:p-2.5 mb-2.5">
+          <label className="flex items-center gap-2 cursor-pointer select-none text-xs font-mono text-slate-300">
+            <input
+              type="checkbox"
+              checked={enableMultiplayer}
+              onChange={(e) => setEnableMultiplayer(e.target.checked)}
+              className="w-4 h-4 rounded border-slate-600 bg-slate-800 text-sky-500 focus:ring-sky-500 cursor-pointer"
+            />
+            <span className="flex items-center gap-1.5 font-semibold text-white">
+              {enableMultiplayer ? (
+                <Users className="w-3.5 h-3.5 text-emerald-400" />
+              ) : (
+                <Bot className="w-3.5 h-3.5 text-red-400" />
+              )}
+              Online Multiplayer
+            </span>
+          </label>
+          <span className={`text-[10px] font-mono px-2 py-0.5 rounded border ${
+            enableMultiplayer
+              ? 'bg-emerald-950/60 text-emerald-300 border-emerald-700/60'
+              : 'bg-red-950/60 text-red-300 border-red-700/60'
+          }`}>
+            {enableMultiplayer ? 'Socket.io Server' : 'Offline AI Bandit'}
+          </span>
         </div>
 
         {/* Fullscreen Option Row */}

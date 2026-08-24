@@ -65,6 +65,8 @@ export function useFlightPhysics() {
   const quatRef = useRef<THREE.Quaternion>(new THREE.Quaternion());
   const hasEverBeenAirborneRef = useRef<boolean>(false);
   const healthRef = useRef<number>(100);
+  const isCrashedRef = useRef<boolean>(false);
+  const crashReasonRef = useRef<string | null>(null);
 
   // Aircraft physical constants
   const mass = 700; // kg
@@ -89,6 +91,8 @@ export function useFlightPhysics() {
     velRef.current.copy(forward.multiplyScalar(initialSpeedMs));
     hasEverBeenAirborneRef.current = airborne;
     healthRef.current = 100;
+    isCrashedRef.current = false;
+    crashReasonRef.current = null;
 
     setTelemetry({
       ...INITIAL_STATE,
@@ -116,8 +120,23 @@ export function useFlightPhysics() {
   ) => {
     const dt = Math.min(delta, 0.05);
 
-    if (telemetry.isCrashed) {
-      return telemetry;
+    if (isCrashedRef.current || healthRef.current <= 0) {
+      isCrashedRef.current = true;
+      if (!crashReasonRef.current) {
+        crashReasonRef.current = 'Shot down in aerial combat!';
+      }
+      velRef.current.set(0, 0, 0);
+      const crashedTelemetry: FlightTelemetry = {
+        ...telemetry,
+        isCrashed: true,
+        crashReason: crashReasonRef.current,
+        health: 0,
+        airspeedKnots: 0,
+        airspeedMs: 0,
+        throttle: 0,
+        velocity: [0, 0, 0]
+      };
+      return crashedTelemetry;
     }
 
     const pos = posRef.current;
@@ -331,8 +350,8 @@ export function useFlightPhysics() {
       isBraking: inputs.brakes,
       isGrounded,
       isStalling,
-      isCrashed: false,
-      crashReason: null,
+      isCrashed: isCrashedRef.current,
+      crashReason: crashReasonRef.current,
       isLanded,
       health: healthRef.current,
       maxHealth: 100
@@ -340,26 +359,40 @@ export function useFlightPhysics() {
 
     setTelemetry(newTelemetry);
     return newTelemetry;
-  }, [telemetry.isCrashed]);
+  }, []);
 
   const triggerCrash = useCallback((reason: string) => {
+    isCrashedRef.current = true;
+    crashReasonRef.current = reason;
+    velRef.current.set(0, 0, 0);
     setTelemetry((prev) => ({
       ...prev,
       isCrashed: true,
       crashReason: reason,
-      velocity: [0, 0, 0]
+      velocity: [0, 0, 0],
+      airspeedKnots: 0,
+      airspeedMs: 0,
+      throttle: 0
     }));
   }, []);
 
   const applyDamage = useCallback((amount: number, reason: string = 'Shot down in aerial combat!') => {
     healthRef.current = Math.max(0, healthRef.current - amount);
     const remaining = healthRef.current;
+    if (remaining <= 0) {
+      isCrashedRef.current = true;
+      crashReasonRef.current = reason;
+      velRef.current.set(0, 0, 0);
+    }
     setTelemetry((prev) => ({
       ...prev,
       health: remaining,
-      isCrashed: remaining <= 0 ? true : prev.isCrashed,
-      crashReason: remaining <= 0 ? reason : prev.crashReason,
-      velocity: remaining <= 0 ? [0, 0, 0] : prev.velocity
+      isCrashed: remaining <= 0 ? true : isCrashedRef.current,
+      crashReason: remaining <= 0 ? reason : crashReasonRef.current,
+      velocity: remaining <= 0 ? [0, 0, 0] : prev.velocity,
+      airspeedKnots: remaining <= 0 ? 0 : prev.airspeedKnots,
+      airspeedMs: remaining <= 0 ? 0 : prev.airspeedMs,
+      throttle: remaining <= 0 ? 0 : prev.throttle
     }));
     return remaining;
   }, []);

@@ -14,7 +14,8 @@ import {
   Maximize2,
   Minimize2,
   Shield,
-  Crosshair
+  Crosshair,
+  Swords
 } from 'lucide-react';
 import { CameraMode, FlightTelemetry, FlapStage, LocalPlayerIdentity, RemotePlayer, TacticalRadarData } from '../../types/flight';
 import { ThrottleSlider } from './ThrottleSlider';
@@ -136,14 +137,21 @@ export const HUD: React.FC<HUDProps> = ({
             <span className="text-slate-600">|</span>
             <span className="text-sky-300 uppercase">{cameraMode}</span>
 
-            {multiplayer && multiplayer.isConnected && (
-              <>
-                <span className="text-slate-600">|</span>
-                <div className="flex items-center gap-0.5 text-emerald-400 font-bold">
-                  <Users className="w-2.5 h-2.5 inline" />
-                  <span>{pilotsCount}</span>
-                </div>
-              </>
+            <span className="text-slate-600">|</span>
+            {multiplayer && multiplayer.isConnected ? (
+              <div className="flex items-center gap-1 text-emerald-400 font-bold" title="Online Multiplayer Lobby">
+                <Users className="w-2.5 h-2.5 inline" />
+                <span>{pilotsCount}</span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-1 text-red-400 font-bold" title="Offline Dogfight vs AI Bandits">
+                <Swords className="w-2.5 h-2.5 inline" />
+                <span>
+                  {multiplayer?.remotePlayers && multiplayer.remotePlayers.length > 1
+                    ? `${multiplayer.remotePlayers.filter((p) => !p.isCrashed).length}/${multiplayer.remotePlayers.length} BANDITS`
+                    : 'AI BANDIT'}
+                </span>
+              </div>
             )}
           </div>
 

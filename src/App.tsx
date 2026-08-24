@@ -5,6 +5,7 @@ import { useFlightPhysics } from './hooks/useFlightPhysics';
 import { useCollision } from './hooks/useCollision';
 import { useAudioEngine } from './hooks/useAudioEngine';
 import { useMultiplayer } from './hooks/useMultiplayer';
+import { useAIBandits } from './hooks/useAIBandits';
 import { computeCombatTargeting } from './hooks/useCombatTargeting';
 import { WorldScene } from './components/3d/WorldScene';
 import { BulletsHandle } from './components/3d/Bullets';
@@ -60,6 +61,14 @@ const CombatTargetingManager: React.FC<{
 // Sub-component inside Canvas to run physics & combat loop at RAF rate
 const FlightPhysicsLoop: React.FC<{
   updatePhysics: (delta: number, inputs: ControlInputs, groundElevation: number, isOnRunway: boolean) => FlightTelemetry;
+  updateBandits?: (
+    delta: number,
+    playerPos: THREE.Vector3,
+    playerVel: THREE.Vector3,
+    playerQuat: THREE.Quaternion,
+    isPlayerCrashed: boolean,
+    bulletsHandle?: BulletsHandle | null
+  ) => RemotePlayer[];
   getInputs: () => ControlInputs;
   getGroundInfo: (pos: THREE.Vector3) => { groundElevation: number; isOnRunway: boolean };
   checkCollision: (pos: THREE.Vector3, vel: THREE.Vector3, rollDeg: number, pitchDeg: number) => { crashed: boolean; reason: string | null };
@@ -80,6 +89,7 @@ const FlightPhysicsLoop: React.FC<{
   isGameActive: boolean;
 }> = ({
   updatePhysics,
+  updateBandits,
   getInputs,
   getGroundInfo,
   checkCollision,
@@ -193,10 +203,22 @@ const FlightPhysicsLoop: React.FC<{
       }
     }
 
-    // 6. Broadcast telemetry to peers over Socket.io
+    // 6. Update local AI bandits in offline mode
+    if (updateBandits) {
+      updateBandits(
+        delta,
+        pos,
+        vel,
+        quatRef.current,
+        currentTelemetry.isCrashed,
+        bulletsRef.current
+      );
+    }
+
+    // 7. Broadcast telemetry to peers over Socket.io
     broadcastTelemetry(currentTelemetry, quatRef.current, inputs);
 
-    // 7. Update procedural audio engine
+    // 8. Update procedural audio engine
     updateAudio(
       currentTelemetry.throttle,
       currentTelemetry.airspeedKnots,
@@ -211,6 +233,7 @@ const FlightPhysicsLoop: React.FC<{
 
 export function App() {
   const [isStartModalOpen, setIsStartModalOpen] = useState<boolean>(true);
+  const [isMultiplayerEnabled, setIsMultiplayerEnabled] = useState<boolean>(false);
   const [isHelpOpen, setIsHelpOpen] = useState<boolean>(false);
   const [damageFlash, setDamageFlash] = useState<boolean>(false);
   const [targetingData, setTargetingData] = useState<TacticalRadarData>({ targets: [], primaryTarget: null });
@@ -275,9 +298,24 @@ export function App() {
     broadcastCrash,
     broadcastRespawn
   } = useMultiplayer({
+    enabled: isMultiplayerEnabled,
     onLocalDamage: handleLocalDamage,
     onRemoteBullet: handleRemoteBullet
   });
+
+  const {
+    banditPlayers,
+    banditPlayersRef,
+    updateBandits,
+    damageBandit,
+    resetBandits
+  } = useAIBandits({
+    enabled: !isMultiplayerEnabled,
+    playShootSfx
+  });
+
+  const activeEnemies = isMultiplayerEnabled ? remotePlayers : banditPlayers;
+  const activeEnemiesRef = isMultiplayerEnabled ? remotePlayersRef : banditPlayersRef;
 
   const {
     isFullscreen,
@@ -288,8 +326,12 @@ export function App() {
 
   const handleReset = useCallback(() => {
     resetFlight([0, 7.2, 0], 0, 0, 0, false);
-    broadcastRespawn([0, 7.2, 0]);
-  }, [resetFlight, broadcastRespawn]);
+    if (isMultiplayerEnabled) {
+      broadcastRespawn([0, 7.2, 0]);
+    } else {
+      resetBandits(new THREE.Vector3(0, 7.2, 0));
+    }
+  }, [resetFlight, isMultiplayerEnabled, broadcastRespawn, resetBandits]);
 
   const {
     setThrottle,
@@ -315,29 +357,56 @@ export function App() {
   }, [initAudio, isAudioReady]);
 
   // Handle Scenario Choice: Take Off (Runway)
-  const handleSpawnRunway = useCallback(() => {
+  const handleSpawnRunway = useCallback((enableMultiplayer: boolean) => {
     handleUserInteract();
+    setIsMultiplayerEnabled(enableMultiplayer);
     resetFlight([0, 7.2, 0], 0, 0, 0, false);
-    broadcastRespawn([0, 7.2, 0]);
+    if (enableMultiplayer) {
+      broadcastRespawn([0, 7.2, 0]);
+    } else {
+      resetBandits(new THREE.Vector3(0, 7.2, 0));
+    }
     setThrottle(0);
     setIsStartModalOpen(false);
-  }, [handleUserInteract, resetFlight, broadcastRespawn, setThrottle]);
+  }, [handleUserInteract, resetFlight, broadcastRespawn, resetBandits, setThrottle]);
 
   // Handle Scenario Choice: Spawn In Flight (Airborne with 50% cruise throttle)
-  const handleSpawnInFlight = useCallback(() => {
+  const handleSpawnInFlight = useCallback((enableMultiplayer: boolean) => {
     handleUserInteract();
+    setIsMultiplayerEnabled(enableMultiplayer);
     // Spawn over ocean at 180m (approx 600 ft) heading North, initial speed 48 m/s (~93 knots), 50% cruise throttle
     resetFlight([0, 180, 200], 0, 48, 50, true);
-    broadcastRespawn([0, 180, 200]);
+    if (enableMultiplayer) {
+      broadcastRespawn([0, 180, 200]);
+    } else {
+      resetBandits(new THREE.Vector3(0, 180, 200));
+    }
     setThrottle(50);
     setIsStartModalOpen(false);
-  }, [handleUserInteract, resetFlight, broadcastRespawn, setThrottle]);
+  }, [handleUserInteract, resetFlight, broadcastRespawn, resetBandits, setThrottle]);
 
   const handleBulletHit = useCallback((targetId: string, bulletId: string, damage: number) => {
     playHitMarkerSfx();
     setHitMarkerTime(performance.now());
-    reportBulletHit(targetId, bulletId, damage);
-  }, [playHitMarkerSfx, reportBulletHit]);
+    if (targetId.startsWith('bandit')) {
+      damageBandit(targetId, damage);
+    } else if (isMultiplayerEnabled) {
+      reportBulletHit(targetId, bulletId, damage);
+    }
+  }, [damageBandit, isMultiplayerEnabled, playHitMarkerSfx, reportBulletHit]);
+
+  const handleLocalBulletHit = useCallback((damage: number, shooterId: string) => {
+    const enemy = activeEnemiesRef.current.find((p) => p.id === shooterId);
+    const shooterCallsign = enemy ? enemy.callsign : shooterId.startsWith('bandit') ? 'AI BANDIT' : 'Enemy Aircraft';
+
+    handleLocalDamage({
+      targetId: identity?.id || 'local',
+      shooterId,
+      shooterCallsign,
+      damage,
+      remainingHealth: Math.max(0, telemetry.health - damage)
+    });
+  }, [handleLocalDamage, identity?.id, telemetry.health, activeEnemiesRef]);
 
   useEffect(() => {
     window.addEventListener('click', handleUserInteract, { once: true });
@@ -370,22 +439,24 @@ export function App() {
           forwardSpeed={telemetry.airspeedMs}
           isCrashed={telemetry.isCrashed}
           cameraMode={cameraMode}
-          remotePlayers={remotePlayers}
+          remotePlayers={activeEnemies}
           bulletsRef={bulletsRef}
           localId={identity?.id}
           onBulletHit={handleBulletHit}
+          onLocalHit={handleLocalBulletHit}
         />
 
         <CombatTargetingManager
           playerPosRef={posRef}
           playerQuatRef={quatRef}
           playerSpeedMs={telemetry.airspeedMs}
-          remotePlayers={remotePlayers}
+          remotePlayers={activeEnemies}
           onTargetingUpdate={setTargetingData}
         />
 
         <FlightPhysicsLoop
           updatePhysics={updatePhysics}
+          updateBandits={!isMultiplayerEnabled ? updateBandits : undefined}
           getInputs={getInputs}
           getGroundInfo={getGroundInfo}
           checkCollision={checkCollision}
@@ -400,7 +471,7 @@ export function App() {
           broadcastShoot={broadcastShoot}
           posRef={posRef}
           quatRef={quatRef}
-          remotePlayersRef={remotePlayersRef}
+          remotePlayersRef={activeEnemiesRef}
           bulletsRef={bulletsRef}
           localId={identity?.id}
           isGameActive={!isStartModalOpen}
@@ -430,9 +501,9 @@ export function App() {
         hitMarkerTime={hitMarkerTime}
         multiplayer={{
           isConnected,
-          onlineCount,
+          onlineCount: isMultiplayerEnabled ? onlineCount : 1,
           identity,
-          remotePlayers
+          remotePlayers: activeEnemies
         }}
       />
 
