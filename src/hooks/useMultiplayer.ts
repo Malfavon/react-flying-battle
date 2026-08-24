@@ -4,11 +4,12 @@ import * as THREE from 'three';
 import { RemotePlayer, LocalPlayerIdentity, FlightTelemetry, ControlInputs, Bullet, DamageEvent } from '../types/flight';
 
 interface UseMultiplayerProps {
+  enabled?: boolean;
   onLocalDamage?: (event: DamageEvent) => void;
   onRemoteBullet?: (bullet: Bullet) => void;
 }
 
-export function useMultiplayer({ onLocalDamage, onRemoteBullet }: UseMultiplayerProps = {}) {
+export function useMultiplayer({ enabled = false, onLocalDamage, onRemoteBullet }: UseMultiplayerProps = {}) {
   const socketRef = useRef<Socket | null>(null);
   const [isConnected, setIsConnected] = useState<boolean>(false);
   const [identity, setIdentity] = useState<LocalPlayerIdentity | null>(null);
@@ -26,6 +27,18 @@ export function useMultiplayer({ onLocalDamage, onRemoteBullet }: UseMultiplayer
   }, [onLocalDamage, onRemoteBullet]);
 
   useEffect(() => {
+    if (!enabled) {
+      setIsConnected(false);
+      setIdentity(null);
+      setRemotePlayers([]);
+      remotePlayersRef.current = [];
+      if (socketRef.current) {
+        socketRef.current.disconnect();
+        socketRef.current = null;
+      }
+      return;
+    }
+
     // Determine backend Socket.io server URL
     // Priority:
     // 1. VITE_SERVER_URL environment variable (configured in Vercel / .env)
@@ -148,7 +161,7 @@ export function useMultiplayer({ onLocalDamage, onRemoteBullet }: UseMultiplayer
     return () => {
       socket.disconnect();
     };
-  }, []);
+  }, [enabled]);
 
   // Send local telemetry (throttled to ~30Hz)
   const broadcastTelemetry = useCallback((

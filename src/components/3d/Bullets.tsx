@@ -37,7 +37,9 @@ interface MuzzleFlashState {
 interface BulletsProps {
   remotePlayers: RemotePlayer[];
   localId?: string;
+  localPos?: [number, number, number];
   onBulletHit?: (targetId: string, bulletId: string, damage: number) => void;
+  onLocalHit?: (damage: number, shooterId: string) => void;
 }
 
 const MAX_BULLETS = 400;
@@ -47,7 +49,9 @@ const BULLET_RADIUS = 3.2; // Realistic aircraft hitbox radius (meters) with con
 export const Bullets = forwardRef<BulletsHandle, BulletsProps>(({
   remotePlayers,
   localId,
-  onBulletHit
+  localPos,
+  onBulletHit,
+  onLocalHit
 }, ref) => {
   const bulletsRef = useRef<ActiveBullet[]>([]);
   const sparksRef = useRef<Spark[]>([]);
@@ -190,10 +194,10 @@ export const Bullets = forwardRef<BulletsHandle, BulletsProps>(({
 
       // Continuous Swept-Segment Hit Detection (Zero Tunneling)
       const isLocalBullet = !b.shooterId || b.shooterId === 'local' || (localId && b.shooterId === localId);
-      if (isLocalBullet && targetEntities.length > 0) {
-        const seg = new THREE.Vector3().subVectors(b.pos, b.prevPos);
-        const segLenSq = seg.lengthSq();
+      const seg = new THREE.Vector3().subVectors(b.pos, b.prevPos);
+      const segLenSq = seg.lengthSq();
 
+      if (isLocalBullet && targetEntities.length > 0) {
         for (let t = 0; t < targetEntities.length; t++) {
           const target = targetEntities[t];
 
@@ -217,6 +221,26 @@ export const Bullets = forwardRef<BulletsHandle, BulletsProps>(({
             }
             break;
           }
+        }
+      } else if (!isLocalBullet && localPos && onLocalHit) {
+        // Non-local bullet (e.g. fired by AI bandit or remote player): check hit on local player
+        const localTargetPos = new THREE.Vector3(localPos[0], localPos[1], localPos[2]);
+        let distSq = 0;
+        let closestPoint = b.pos;
+
+        if (segLenSq > 0.0001) {
+          const toTarget = new THREE.Vector3().subVectors(localTargetPos, b.prevPos);
+          const factor = THREE.MathUtils.clamp(toTarget.dot(seg) / segLenSq, 0, 1);
+          closestPoint = b.prevPos.clone().addScaledVector(seg, factor);
+          distSq = closestPoint.distanceToSquared(localTargetPos);
+        } else {
+          distSq = b.pos.distanceToSquared(localTargetPos);
+        }
+
+        if (distSq <= BULLET_RADIUS * BULLET_RADIUS) {
+          hit = true;
+          spawnSparks(closestPoint);
+          onLocalHit(b.damage, b.shooterId);
         }
       }
 
